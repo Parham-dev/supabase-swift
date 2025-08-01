@@ -6,21 +6,26 @@ Implements data access for Supabase services including authentication, database 
 
 ### SupabaseAuthDataSource.swift
 Complete authentication service for Supabase Auth integration. Handles user authentication workflows, session management, and secure token storage. Features include:
-- Sign in/up with email and password
-- OAuth provider authentication (Google, Apple, etc.)
+- Sign in/up with email and password  
 - Session management with automatic token refresh
-- Password reset and profile updates
+- User profile management and metadata
 - Secure token storage via KeychainService integration
 - Session restoration from stored credentials
 - Comprehensive error handling with user-friendly messages
-- Mock implementation for testing
+- Subscription tier and feature extraction
 
 Usage:
 ```swift
-let authDataSource = SupabaseAuthDataSource(supabaseClient: client)
+let authDataSource = SupabaseAuthDataSource(
+    httpClient: supabaseClient, 
+    baseURL: baseURL,
+    keychainService: KeychainService.shared
+)
 let user = try await authDataSource.signIn(email: "user@example.com", password: "password")
 let isAuthenticated = await authDataSource.isAuthenticated()
 ```
+
+**Note**: Mock implementation moved to `Tests/SwiftSupabaseSyncTests/Mocks/MockSupabaseAuthDataSource.swift`
 
 ### SupabaseDataDataSource.swift
 Database operations service for Supabase PostgreSQL integration. Provides CRUD operations, bulk sync capabilities, and conflict detection for Syncable entities. Features include:
@@ -35,7 +40,7 @@ Database operations service for Supabase PostgreSQL integration. Provides CRUD o
 
 Usage:
 ```swift
-let dataSource = SupabaseDataDataSource(supabaseClient: client)
+let dataSource = SupabaseDataDataSource(httpClient: supabaseClient, baseURL: baseURL)
 let snapshots = try await dataSource.fetchRecordsModifiedAfter(lastSyncDate, from: "todos")
 let results = try await dataSource.batchUpsert(localSnapshots, into: "todos")
 ```
@@ -53,7 +58,7 @@ Real-time subscription service for Supabase Realtime integration. Enables live d
 
 Usage:
 ```swift
-let realtimeSource = SupabaseRealtimeDataSource(supabaseClient: client)
+let realtimeSource = SupabaseRealtimeDataSource(baseURL: baseURL)
 try await realtimeSource.connect()
 
 // Subscribe to table changes
@@ -61,8 +66,12 @@ let subscriptionId = try await realtimeSource.subscribeToTable("todos") { event 
     handleRealtimeChange(event)
 }
 
-// Monitor specific record
-try await realtimeSource.subscribeToRecord(syncID: recordId, in: "todos")
+// Monitor connection status
+realtimeSource.connectionEventPublisher
+    .sink { connectionEvent in
+        handleConnectionChange(connectionEvent)
+    }
+    .store(in: &cancellables)
 ```
 
 ## Architecture

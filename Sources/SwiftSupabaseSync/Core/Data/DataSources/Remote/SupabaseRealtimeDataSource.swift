@@ -55,36 +55,41 @@ public final class SupabaseRealtimeDataSource: ObservableObject {
     public func connect() async throws {
         guard connectionStatus != .connected else { return }
         
-        do {
-            connectionStatus = .connecting
-            
-            // Create WebSocket URL
-            var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: true)!
-            components.scheme = baseURL.scheme == "https" ? "wss" : "ws"
-            components.path = "/realtime/v1/websocket"
-            let realtimeURL = components.url!
-            
-            // Create WebSocket connection
-            let session = URLSession.shared
-            webSocketTask = session.webSocketTask(with: URLRequest(url: realtimeURL))
-            
-            // Start listening for messages
-            startListening()
-            
-            // Resume the connection
-            webSocketTask?.resume()
-            
+        connectionStatus = .connecting
+        
+        // Create WebSocket URL
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: true) else {
             await MainActor.run {
-                connectionStatus = .connected
-                connectionEventSubject.send(.connected)
+                connectionStatus = .error("Invalid base URL")
+                connectionEventSubject.send(.error("Invalid base URL"))
             }
-            
-        } catch {
+            throw RealtimeDataSourceError.connectionFailed("Invalid base URL")
+        }
+        
+        components.scheme = baseURL.scheme == "https" ? "wss" : "ws"
+        components.path = "/realtime/v1/websocket"
+        
+        guard let realtimeURL = components.url else {
             await MainActor.run {
-                connectionStatus = .error(error.localizedDescription)
-                connectionEventSubject.send(.error(error.localizedDescription))
+                connectionStatus = .error("Failed to construct WebSocket URL")
+                connectionEventSubject.send(.error("Failed to construct WebSocket URL"))
             }
-            throw RealtimeDataSourceError.connectionFailed("Failed to connect: \(error.localizedDescription)")
+            throw RealtimeDataSourceError.connectionFailed("Failed to construct WebSocket URL")
+        }
+        
+        // Create WebSocket connection
+        let session = URLSession.shared
+        webSocketTask = session.webSocketTask(with: URLRequest(url: realtimeURL))
+        
+        // Start listening for messages
+        startListening()
+        
+        // Resume the connection
+        webSocketTask?.resume()
+        
+        await MainActor.run {
+            connectionStatus = .connected
+            connectionEventSubject.send(.connected)
         }
     }
     
