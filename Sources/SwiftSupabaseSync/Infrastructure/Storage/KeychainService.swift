@@ -470,6 +470,9 @@ public protocol KeychainServiceProtocol {
     func delete(_ key: String) throws
     func exists(_ key: String) -> Bool
     func clearAll() throws
+    func clearAuthenticationData() throws
+    func retrieveAccessToken() throws -> String?
+    func retrieveRefreshToken() throws -> String?
 }
 
 extension KeychainService: KeychainServiceProtocol {}
@@ -515,6 +518,20 @@ public final class MockKeychainService: KeychainServiceProtocol {
             throw error
         }
         storage.removeAll()
+    }
+    
+    public func clearAuthenticationData() throws {
+        try? delete("access_token")
+        try? delete("refresh_token")
+        try? delete("user_session")
+    }
+    
+    public func retrieveAccessToken() throws -> String? {
+        return try retrieve(key: "access_token")
+    }
+    
+    public func retrieveRefreshToken() throws -> String? {
+        return try retrieve(key: "refresh_token")
     }
     
     // MARK: - Test Helpers
