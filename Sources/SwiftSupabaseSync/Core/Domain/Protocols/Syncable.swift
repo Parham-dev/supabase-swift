@@ -65,7 +65,7 @@ public protocol Syncable: PersistentModel {
     
     /// Called after conflict resolution is applied
     /// Override to perform cleanup after conflict resolution
-    func didResolveConflict(resolution: ConflictResolutionResult)
+    func didResolveConflict(resolution: SyncableConflictResolutionResult)
 }
 
 // MARK: - Default Implementations
@@ -136,7 +136,7 @@ public extension Syncable {
     }
     
     /// Default post-conflict resolution cleanup
-    func didResolveConflict(resolution: ConflictResolutionResult) {
+    func didResolveConflict(resolution: SyncableConflictResolutionResult) {
         switch resolution {
         case .localWins:
             // Local version kept, update sync timestamp
@@ -166,7 +166,7 @@ public extension Syncable {
 
 // MARK: - Supporting Types
 
-public enum ConflictResolutionResult {
+public enum SyncableConflictResolutionResult {
     case localWins
     case remoteWins([String: Any])
     case merged([String: Any])
