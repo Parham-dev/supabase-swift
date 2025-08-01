@@ -23,6 +23,12 @@ let package = Package(
             name: "SwiftSupabaseSync",
             dependencies: [
                 .product(name: "Logging", package: "swift-log")
+            ],
+            sources: [
+                "SwiftSupabaseSync.swift",
+                "Core/Common/Extensions/ArrayExtensions.swift",
+                "Infrastructure/Network/NetworkError.swift",
+                "Core/Domain/Entities/SharedTypes.swift"
             ]
         ),
         .testTarget(
