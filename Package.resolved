@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/supabase/supabase-swift.git",
       "state" : {
-        "revision" : "49ca2cb04bfdf26a1cdef8d3a7bbcebb27b0e93c",
-        "version" : "2.20.1"
+        "revision" : "6a45515b76da19004d8df150764bcd8f355469c9",
+        "version" : "2.31.0"
       }
     },
     {
@@ -16,6 +16,15 @@
       "state" : {
         "revision" : "f70225981241859eb4aa1a18a75531d26637c8cc",
         "version" : "1.4.0"
+      }
+    },
+    {
+      "identity" : "swift-clocks",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pointfreeco/swift-clocks",
+      "state" : {
+        "revision" : "cc46202b53476d64e824e0b6612da09d84ffde8e",
+        "version" : "1.0.6"
       }
     },
     {
@@ -34,6 +43,15 @@
       "state" : {
         "revision" : "176abc28e002a9952470f08745cd26fad9286776",
         "version" : "3.13.3"
+      }
+    },
+    {
+      "identity" : "swift-http-types",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-http-types.git",
+      "state" : {
+        "revision" : "a0a57e949a8903563aba4615869310c0ebf14c03",
+        "version" : "1.4.0"
       }
     },
     {
