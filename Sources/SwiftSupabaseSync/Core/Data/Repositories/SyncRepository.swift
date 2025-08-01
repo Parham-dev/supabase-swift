@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import CryptoKit
 
 /// Implementation of SyncRepositoryProtocol that bridges sync use cases with data sources
 /// Coordinates between LocalDataSource, SupabaseDataDataSource, and supporting services
@@ -19,6 +18,9 @@ public final class SyncRepository: SyncRepositoryProtocol {
     private let realtimeDataSource: SupabaseRealtimeDataSource?
     private let metadataManager: SyncMetadataManager
     private let operationsManager: SyncOperationsManager
+    private let conflictResolutionService: SyncConflictResolutionService
+    private let schemaValidationService: SyncSchemaValidationService
+    private let integrityValidationService: SyncIntegrityValidationService
     private let logger: SyncLoggerProtocol?
     
     // MARK: - Initialization
@@ -45,6 +47,16 @@ public final class SyncRepository: SyncRepositoryProtocol {
         self.operationsManager = SyncOperationsManager(
             localDataSource: localDataSource,
             remoteDataSource: remoteDataSource,
+            metadataManager: metadataManager,
+            logger: logger
+        )
+        self.conflictResolutionService = SyncConflictResolutionService(
+            localDataSource: localDataSource,
+            logger: logger
+        )
+        self.schemaValidationService = SyncSchemaValidationService(logger: logger)
+        self.integrityValidationService = SyncIntegrityValidationService(
+            localDataSource: localDataSource,
             metadataManager: metadataManager,
             logger: logger
         )
@@ -216,133 +228,7 @@ public final class SyncRepository: SyncRepositoryProtocol {
     
     /// Resolve conflicts and apply resolutions
     public func applyConflictResolutions(_ resolutions: [ConflictResolution]) async throws -> [ConflictApplicationResult] {
-        logger?.debug("SyncRepository: Applying \(resolutions.count) conflict resolutions")
-        
-        var results: [ConflictApplicationResult] = []
-        
-        for resolution in resolutions {
-            do {
-                let success = try await applyConflictResolution(resolution)
-                let result = ConflictApplicationResult(
-                    resolution: resolution,
-                    success: success
-                )
-                results.append(result)
-                
-            } catch {
-                logger?.error("SyncRepository: Failed to apply conflict resolution - \(error.localizedDescription)")
-                let result = ConflictApplicationResult(
-                    resolution: resolution,
-                    success: false,
-                    error: SyncError.unknownError(error.localizedDescription)
-                )
-                results.append(result)
-            }
-        }
-        
-        let successCount = results.filter { $0.success }.count
-        logger?.info("SyncRepository: Applied \(successCount)/\(results.count) conflict resolutions successfully")
-        return results
-    }
-    
-    /// Apply a single conflict resolution
-    /// - Parameter resolution: The conflict resolution to apply
-    /// - Returns: Whether the resolution was applied successfully
-    private func applyConflictResolution(_ resolution: ConflictResolution) async throws -> Bool {
-        switch resolution.strategy {
-        case .lastWriteWins:
-            // Use the version with the most recent timestamp
-            if let data = resolution.resolvedData {
-                return try await applyResolvedData(data, using: resolution)
-            }
-            return false
-            
-        case .firstWriteWins:
-            // Use the version with the earliest timestamp
-            if let data = resolution.resolvedData {
-                return try await applyResolvedData(data, using: resolution)
-            }
-            return false
-            
-        case .manual:
-            // Apply manual resolution data
-            if let data = resolution.resolvedData {
-                return try await applyResolvedData(data, using: resolution)
-            }
-            return false
-            
-        case .localWins:
-            // Apply local version
-            if let data = resolution.resolvedData {
-                return try await applyResolvedData(data, using: resolution)
-            }
-            return false
-            
-        case .remoteWins:
-            // Apply remote version
-            if let data = resolution.resolvedData {
-                return try await applyResolvedData(data, using: resolution)
-            }
-            return false
-        }
-    }
-    
-    /// Apply resolved data to local storage
-    /// - Parameters:
-    ///   - data: The resolved record data
-    ///   - resolution: The conflict resolution metadata
-    /// - Returns: Whether the data was applied successfully
-    private func applyResolvedData(_ data: [String: Any], using resolution: ConflictResolution) async throws -> Bool {
-        // Convert resolved data to SyncSnapshot for application
-        guard let syncIDString = data["sync_id"] as? String,
-              let syncID = UUID(uuidString: syncIDString),
-              let tableName = data["table_name"] as? String,
-              let version = data["version"] as? Int,
-              let lastModifiedTimestamp = data["last_modified"] as? Double,
-              let isDeleted = data["is_deleted"] as? Bool else {
-            logger?.error("SyncRepository: Invalid resolved data format")
-            return false
-        }
-        
-        let lastModified = Date(timeIntervalSince1970: lastModifiedTimestamp)
-        let lastSynced = Date() // Mark as just synced
-        
-        // Create content hash from resolved data
-        let contentHash = generateContentHashFromData(data)
-        
-        let resolvedSnapshot = SyncSnapshot(
-            syncID: syncID,
-            tableName: tableName,
-            version: version,
-            lastModified: lastModified,
-            lastSynced: lastSynced,
-            isDeleted: isDeleted,
-            contentHash: contentHash,
-            conflictData: [:]
-        )
-        
-        // Apply the resolved snapshot to local storage
-        let applicationResults = localDataSource.applyRemoteChanges([resolvedSnapshot])
-        
-        return applicationResults.first?.success ?? false
-    }
-    
-    /// Generate content hash from resolved data
-    /// - Parameter data: The resolved record data
-    /// - Returns: Content hash string
-    private func generateContentHashFromData(_ data: [String: Any]) -> String {
-        // Create sorted components from the data
-        var components: [String] = []
-        
-        for (key, value) in data.sorted(by: { $0.key < $1.key }) {
-            // Skip metadata fields
-            if !["sync_id", "table_name", "last_modified", "last_synced", "is_deleted", "version"].contains(key) {
-                components.append("\(key):\(value)")
-            }
-        }
-        
-        let contentString = components.joined(separator: "|")
-        return contentString.isEmpty ? "empty" : contentString.sha256
+        return try await conflictResolutionService.applyConflictResolutions(resolutions)
     }
     
     /// Get unresolved conflicts
@@ -399,78 +285,13 @@ public final class SyncRepository: SyncRepositoryProtocol {
     // MARK: - Schema & Migration (Still stub implementations)
     
     public func checkSchemaCompatibility<T: Syncable>(for entityType: T.Type) async throws -> SchemaCompatibilityResult {
-        logger?.debug("SyncRepository: Checking schema compatibility for \(entityType)")
-        
-        let entityTypeName = String(describing: entityType)
         let tableName = getTableName(for: entityType)
-        
-        do {
-            // Get local schema information
-            let localSchemaVersion = getLocalSchemaVersion(for: entityType)
-            
-            // Get remote schema information - for now, we'll assume remote version exists
-            // In a real implementation, this would query the remote database schema
-            let remoteSchemaVersion = try await getRemoteSchemaVersion(tableName: tableName)
-            
-            // Compare schemas
-            let isCompatible = localSchemaVersion == remoteSchemaVersion
-            var differences: [SchemaDifference] = []
-            var requiresMigration = false
-            
-            if !isCompatible {
-                // In a real implementation, we would compare actual schema structures
-                // For now, create a basic difference based on version mismatch
-                let difference = SchemaDifference(
-                    type: .fieldTypeChanged,
-                    fieldName: "schema_version",
-                    localValue: localSchemaVersion,
-                    remoteValue: remoteSchemaVersion,
-                    description: "Schema version mismatch detected"
-                )
-                differences.append(difference)
-                requiresMigration = true
-            }
-            
-            let result = SchemaCompatibilityResult(
-                entityType: entityTypeName,
-                isCompatible: isCompatible,
-                localSchemaVersion: localSchemaVersion,
-                remoteSchemaVersion: remoteSchemaVersion,
-                differences: differences,
-                requiresMigration: requiresMigration
-            )
-            
-            logger?.info("SyncRepository: Schema compatibility check completed - compatible: \(isCompatible)")
-            return result
-            
-        } catch {
-            logger?.error("SyncRepository: Schema compatibility check failed - \(error.localizedDescription)")
-            throw SyncRepositoryError.schemaError(error.localizedDescription)
-        }
-    }
-    
-    /// Get local schema version for entity type
-    /// - Parameter entityType: Entity type to get schema version for
-    /// - Returns: Local schema version string
-    private func getLocalSchemaVersion<T: Syncable>(for entityType: T.Type) -> String {
-        // In a real implementation, this would introspect the SwiftData model
-        // For now, return a simple version based on type name
-        let typeName = String(describing: entityType)
-        return "\(typeName)_v1.0"
-    }
-    
-    /// Get remote schema version for table
-    /// - Parameter tableName: Remote table name
-    /// - Returns: Remote schema version string
-    private func getRemoteSchemaVersion(tableName: String) async throws -> String {
-        // In a real implementation, this would query the remote database
-        // for schema version information (e.g., from a schema_versions table)
-        // For now, return a simple version
-        return "\(tableName)_v1.0"
+        return try await schemaValidationService.checkSchemaCompatibility(for: entityType, tableName: tableName)
     }
     
     public func updateRemoteSchema<T: Syncable>(for entityType: T.Type) async throws -> SchemaUpdateResult {
-        throw SyncRepositoryError.notImplemented("Remote schema update not yet implemented")
+        let tableName = getTableName(for: entityType)
+        return try await schemaValidationService.updateRemoteSchema(for: entityType, tableName: tableName)
     }
     
     // MARK: - Cleanup & Maintenance (NOW IMPLEMENTED)
@@ -487,102 +308,7 @@ public final class SyncRepository: SyncRepositoryProtocol {
     }
     
     public func validateSyncIntegrity<T: Syncable>(for entityType: T.Type) async throws -> SyncIntegrityResult {
-        logger?.debug("SyncRepository: Validating sync integrity for \(entityType)")
-        
-        let entityTypeName = String(describing: entityType)
-        var issues: [IntegrityIssue] = []
-        var recordsChecked = 0
-        
-        do {
-            // Get all local records for this entity type
-            let allLocalRecords = try localDataSource.fetchRecordsModifiedAfter(entityType, date: Date(timeIntervalSince1970: 0), limit: nil)
-            recordsChecked = allLocalRecords.count
-            
-            for record in allLocalRecords {
-                // Check 1: Validate content hash consistency
-                let expectedHash = record.contentHash
-                let actualHash = generateContentHash(for: record)
-                
-                if expectedHash != actualHash {
-                    let issue = IntegrityIssue(
-                        type: .checksumMismatch,
-                        recordID: record.syncID,
-                        description: "Content hash mismatch: expected \(expectedHash), got \(actualHash)",
-                        severity: .critical
-                    )
-                    issues.append(issue)
-                }
-                
-                // Check 2: Validate sync metadata consistency
-                if record.lastSynced != nil && record.lastSynced! > record.lastModified {
-                    let issue = IntegrityIssue(
-                        type: .timestampInconsistency,
-                        recordID: record.syncID,
-                        description: "Last synced timestamp is newer than last modified timestamp",
-                        severity: .medium
-                    )
-                    issues.append(issue)
-                }
-                
-                // Check 3: Validate version consistency
-                if record.version < 1 {
-                    let issue = IntegrityIssue(
-                        type: .versionMismatch,
-                        recordID: record.syncID,
-                        description: "Invalid version number: \(record.version)",
-                        severity: .critical
-                    )
-                    issues.append(issue)
-                }
-                
-                // Check 4: Validate sync ID
-                if record.syncID.uuidString.isEmpty {
-                    let issue = IntegrityIssue(
-                        type: .duplicateRecord,
-                        recordID: record.syncID,
-                        description: "Invalid or empty sync ID",
-                        severity: .critical
-                    )
-                    issues.append(issue)
-                }
-            }
-            
-            // Check 5: Validate sync metadata consistency with metadataManager
-            let _ = await metadataManager.getSyncStatus(for: entityTypeName)
-            let lastSyncTimestamp = await metadataManager.getLastSyncTimestamp(for: entityTypeName)
-            
-            if let lastSync = lastSyncTimestamp {
-                let recordsSyncedAfterLastSync = allLocalRecords.filter { record in
-                    record.lastSynced != nil && record.lastSynced! > lastSync
-                }
-                
-                if !recordsSyncedAfterLastSync.isEmpty {
-                    let issue = IntegrityIssue(
-                        type: .orphanedRecord,
-                        recordID: nil,
-                        description: "\(recordsSyncedAfterLastSync.count) records have sync timestamps newer than the last recorded sync",
-                        severity: .medium
-                    )
-                    issues.append(issue)
-                }
-            }
-            
-            let isValid = issues.filter { $0.severity == .critical }.isEmpty
-            
-            let result = SyncIntegrityResult(
-                entityType: entityTypeName,
-                isValid: isValid,
-                issues: issues,
-                recordsChecked: recordsChecked
-            )
-            
-            logger?.info("SyncRepository: Integrity validation completed - valid: \(isValid), issues: \(issues.count)")
-            return result
-            
-        } catch {
-            logger?.error("SyncRepository: Integrity validation failed - \(error.localizedDescription)")
-            throw SyncRepositoryError.fetchFailed(error.localizedDescription)
-        }
+        return try await integrityValidationService.validateSyncIntegrity(for: entityType)
     }
     
     // MARK: - Private Helper Methods
@@ -612,15 +338,5 @@ public final class SyncRepository: SyncRepositoryProtocol {
     private func generateContentHash<T: Syncable>(for entity: T) -> String {
         // Use the entity's own contentHash implementation
         return entity.contentHash
-    }
-}
-
-// MARK: - String SHA256 Extension
-
-private extension String {
-    var sha256: String {
-        let data = Data(self.utf8)
-        let hashed = SHA256.hash(data: data)
-        return hashed.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
