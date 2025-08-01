@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CryptoKit
 import SwiftData
 
 /// Protocol that SwiftData models must conform to for synchronization
@@ -93,11 +94,27 @@ public extension Syncable {
     
     /// Content hash based on syncable properties
     var contentHash: String {
-        // In a real implementation, this would use reflection
-        // to get actual property values and create a hash
-        // For now, use basic implementation
-        let contentString = "\(syncID)-\(version)-\(lastModified.timeIntervalSince1970)"
+        // Create hash from syncable properties
+        // This implementation uses metadata properties since we can't use reflection
+        // in a protocol extension. Concrete types should override for better accuracy.
+        var components: [String] = []
         
+        // Include syncID for uniqueness
+        components.append("id:\(syncID.uuidString)")
+        
+        // Include version for change tracking
+        components.append("v:\(version)")
+        
+        // Include modification timestamp
+        components.append("mod:\(lastModified.timeIntervalSince1970)")
+        
+        // Include deletion state
+        components.append("del:\(isDeleted)")
+        
+        // Sort components for consistent ordering
+        components.sort()
+        
+        let contentString = components.joined(separator:"|")
         return contentString.sha256
     }
     
@@ -324,8 +341,9 @@ public struct SyncSnapshot: Codable, Equatable {
 
 private extension String {
     var sha256: String {
-        // Simple hash implementation - in production would use CryptoKit
-        return String(self.hash)
+        let data = Data(self.utf8)
+        let hashed = SHA256.hash(data: data)
+        return hashed.compactMap { String(format: "%02x", $0) }.joined()
     }
 }
 

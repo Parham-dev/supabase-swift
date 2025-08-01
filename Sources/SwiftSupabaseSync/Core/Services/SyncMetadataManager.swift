@@ -209,6 +209,32 @@ public actor SyncMetadataManager {
         logger?.debug("SyncMetadataManager: Marked \(syncIDs.count) records as synced for \(entityType)")
     }
     
+    // MARK: - Metadata Management
+    
+    /// Clear sync metadata for an entity type (used for full sync reset)
+    /// - Parameter entityType: Entity type name to clear metadata for
+    public func clearSyncMetadata(for entityType: String) {
+        // Remove sync status
+        syncStatuses.removeValue(forKey: entityType)
+        
+        // Remove last sync timestamp
+        lastSyncTimestamps.removeValue(forKey: entityType)
+        
+        // Cancel any active operations for this entity type
+        let activeOperations = syncOperations.values.filter { 
+            $0.entityType == entityType && $0.state == .running 
+        }
+        
+        for operation in activeOperations {
+            var updatedOperation = operation
+            updatedOperation.state = .cancelled
+            updatedOperation.completedAt = Date()
+            syncOperations[operation.id] = updatedOperation
+        }
+        
+        logger?.debug("SyncMetadataManager: Cleared sync metadata for \(entityType)")
+    }
+    
     // MARK: - Cleanup
     
     /// Clean up old sync metadata

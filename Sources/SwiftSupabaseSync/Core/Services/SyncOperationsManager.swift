@@ -34,6 +34,107 @@ public final class SyncOperationsManager {
     
     // MARK: - Core Sync Operations
     
+    /// Perform a complete full sync for an entity type
+    /// - Parameters:
+    ///   - entityType: Type of entity to sync
+    ///   - policy: Sync policy to apply
+    /// - Returns: Full sync result
+    public func performFullSync<T: Syncable>(
+        ofType entityType: T.Type,
+        using policy: SyncPolicy
+    ) async throws -> FullSyncResult {
+        let entityTypeName = String(describing: entityType)
+        let operationId = UUID()
+        
+        logger?.info("SyncOperationsManager: Starting full sync for \(entityTypeName)")
+        
+        // Start tracking the operation
+        let _ = await metadataManager.startSyncOperation(
+            operationId: operationId,
+            entityType: entityTypeName,
+            operationType: .fullSync
+        )
+        
+        do {
+            let startTime = Date()
+            var uploadedCount = 0
+            var downloadedCount = 0
+            var conflictCount = 0
+            
+            // Step 1: Clear sync metadata for fresh start
+            await metadataManager.clearSyncMetadata(for: entityTypeName)
+            
+            // Step 2: Upload all local changes (including tombstones)
+            let allLocalChanges = try localDataSource.fetchRecordsNeedingSync(entityType, limit: nil)
+            if !allLocalChanges.isEmpty {
+                let snapshots = allLocalChanges.map { convertToSyncSnapshot($0) }
+                let uploadResults = try await uploadChanges(snapshots)
+                uploadedCount = uploadResults.filter { $0.success }.count
+                
+                // Mark successful uploads as synced
+                let successfulSyncIDs = uploadResults.compactMap { result in
+                    result.success ? result.snapshot.syncID : nil
+                }
+                await metadataManager.markRecordsAsSynced(successfulSyncIDs, at: Date(), for: entityTypeName)
+            }
+            
+            // Step 3: Download entire remote dataset
+            let tableName = getTableName(for: entityType)
+            // For full sync, we get everything by using epoch date
+            let epochDate = Date(timeIntervalSince1970: 0)
+            let allRemoteChanges = try await remoteDataSource.fetchRecordsModifiedAfter(epochDate, from: tableName, limit: policy.batchSize)
+            
+            if !allRemoteChanges.isEmpty {
+                // Apply remote changes with conflict detection
+                let applicationResults = localDataSource.applyRemoteChanges(allRemoteChanges)
+                downloadedCount = applicationResults.filter { $0.success }.count
+                conflictCount = applicationResults.filter { $0.conflictDetected }.count
+            }
+            
+            // Step 4: Update sync timestamp
+            await metadataManager.setLastSyncTimestamp(Date(), for: entityTypeName)
+            
+            let duration = Date().timeIntervalSince(startTime)
+            
+            // Complete the operation
+            await metadataManager.completeSyncOperation(
+                operationId,
+                success: true,
+                recordsProcessed: uploadedCount + downloadedCount
+            )
+            
+            let result = FullSyncResult(
+                entityType: entityTypeName,
+                success: true,
+                uploadedCount: uploadedCount,
+                downloadedCount: downloadedCount,
+                conflictCount: conflictCount,
+                duration: duration,
+                startedAt: startTime,
+                completedAt: Date()
+            )
+            
+            logger?.info("SyncOperationsManager: Full sync completed - uploaded: \(uploadedCount), downloaded: \(downloadedCount), conflicts: \(conflictCount)")
+            return result
+            
+        } catch {
+            // Mark operation as failed
+            await metadataManager.completeSyncOperation(
+                operationId,
+                success: false,
+                error: error as? SyncError ?? SyncError.unknownError(error.localizedDescription)
+            )
+            
+            logger?.error("SyncOperationsManager: Full sync failed - \(error.localizedDescription)")
+            
+            return FullSyncResult(
+                entityType: entityTypeName,
+                success: false,
+                error: SyncError.unknownError(error.localizedDescription)
+            )
+        }
+    }
+    
     /// Perform incremental sync for an entity type
     /// - Parameters:
     ///   - entityType: Type of entity to sync
@@ -241,8 +342,7 @@ public final class SyncOperationsManager {
     
     /// Generate content hash for entity
     private func generateContentHash<T: Syncable>(for entity: T) -> String {
-        // Improved content hash - still basic but better than before
-        let baseHash = "\(entity.syncID)_\(entity.version)_\(entity.lastModified.timeIntervalSince1970)"
-        return String(baseHash.hashValue)
+        // Use the entity's own contentHash implementation
+        return entity.contentHash
     }
 }
