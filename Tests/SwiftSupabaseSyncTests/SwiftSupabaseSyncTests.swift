@@ -1,13 +1,15 @@
-import XCTest
+import Testing
 @testable import SwiftSupabaseSync
 
-final class SwiftSupabaseSyncTests: XCTestCase {
-    func testHello() throws {
+struct SwiftSupabaseSyncTests {
+    @Test("Basic initialization test")
+    func testBasicInitialization() throws {
         let sync = SwiftSupabaseSync()
-        XCTAssertEqual(sync.hello(), "Hello from SwiftSupabaseSync!")
+        #expect(sync.hello() == "Hello from SwiftSupabaseSync!")
     }
     
+    @Test("Version test")
     func testVersion() throws {
-        XCTAssertEqual(SwiftSupabaseSync.version, "1.0.0")
+        #expect(SwiftSupabaseSync.version == "1.0.0")
     }
 }
