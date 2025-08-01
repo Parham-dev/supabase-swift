@@ -1,3 +1,10 @@
+//
+//  ResolveSyncConflictUseCase.swift
+//  SupabaseSwift
+//
+//  Created by Parham on 01/08/2025.
+//
+
 import Foundation
 
 /// Use case for resolving synchronization conflicts

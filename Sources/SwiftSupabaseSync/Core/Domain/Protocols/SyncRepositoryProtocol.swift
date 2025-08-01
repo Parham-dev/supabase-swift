@@ -1,3 +1,10 @@
+//
+//  SyncRepositoryProtocol.swift
+//  SupabaseSwift
+//
+//  Created by Parham on 01/08/2025.
+//
+
 import Foundation
 
 /// Protocol defining the interface for synchronization data access

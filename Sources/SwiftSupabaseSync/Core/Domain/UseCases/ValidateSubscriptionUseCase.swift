@@ -1,3 +1,10 @@
+//
+//  ValidateSubscriptionUseCase.swift
+//  SupabaseSwift
+//
+//  Created by Parham on 01/08/2025.
+//
+
 import Foundation
 
 /// Use case for validating subscription status and managing feature access

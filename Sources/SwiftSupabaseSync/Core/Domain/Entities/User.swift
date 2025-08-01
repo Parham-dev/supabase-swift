@@ -1,3 +1,10 @@
+//
+//  User.swift
+//  SupabaseSwift
+//
+//  Created by Parham on 01/08/2025.
+//
+
 import Foundation
 
 /// Domain entity representing a user in the synchronization system

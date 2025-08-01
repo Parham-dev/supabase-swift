@@ -1,3 +1,10 @@
+//
+//  SwiftSupabaseSync.swift
+//  SupabaseSwift
+//
+//  Created by Parham on 01/08/2025.
+//
+
 import Foundation
 
 /// SwiftSupabaseSync - A Swift package for synchronizing SwiftData with Supabase
