@@ -48,13 +48,13 @@ let results = try await dataSource.batchUpsert(localSnapshots, into: "todos")
 ### SupabaseRealtimeDataSource.swift  
 Real-time subscription service for Supabase Realtime integration. Enables live data synchronization and collaborative features with WebSocket-based change notifications. Features include:
 - Table-specific change subscriptions (INSERT, UPDATE, DELETE)
-- Record-level change monitoring
-- Custom channel messaging for app-specific events
-- Presence tracking for user status and collaboration
+- WebSocket-based real-time communication
 - Connection status monitoring with automatic reconnection
 - Reactive programming with Combine publishers
-- Comprehensive filtering and event routing
+- Multi-table subscription support
 - ObservableObject integration for SwiftUI
+
+**Note**: Supporting types moved to `Core/Data/Models/RealtimeProtocolTypes.swift` and public types to `Core/Domain/Entities/RealtimeTypes.swift`
 
 Usage:
 ```swift
