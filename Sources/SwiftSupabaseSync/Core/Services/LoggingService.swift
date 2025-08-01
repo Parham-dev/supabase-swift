@@ -6,10 +6,11 @@
 //
 
 import Foundation
-import os.log
+// import os.log
 
 /// Implementation of SyncLoggerProtocol that provides configurable logging
 /// Supports different log levels, output destinations, and formatting options
+/// Note: Temporarily simplified for Linux compatibility
 public final class LoggingService: SyncLoggerProtocol {
     
     // MARK: - Properties

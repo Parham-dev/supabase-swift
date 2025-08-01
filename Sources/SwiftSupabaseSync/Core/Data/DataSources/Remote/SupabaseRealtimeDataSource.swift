@@ -6,18 +6,19 @@
 //
 
 import Foundation
-import Combine
+// import Combine
 
 /// Remote data source for Supabase real-time subscriptions
 /// Handles real-time change notifications and live data synchronization
-public final class SupabaseRealtimeDataSource: ObservableObject {
+/// Note: Temporarily disabled Combine dependency for Linux compatibility
+public final class SupabaseRealtimeDataSource {
     
     // MARK: - Properties
     
     private let baseURL: URL
     private var webSocketTask: URLSessionWebSocketTask?
     private var subscriptions: [String: RealtimeSubscription] = [:]
-    private var cancellables = Set<AnyCancellable>()
+    // private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Publishers
     
