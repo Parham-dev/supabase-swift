@@ -1,5 +1,14 @@
 name: "Copilot Setup Steps"
 
+# This workflow sets up the development environment for GitHub Copilot coding agent
+# It configures Swift, Xcode, iOS Simulator, and installs helpful development tools
+# The agent will be able to:
+# - Build and test Swift packages
+# - Build and test iOS apps in Xcode
+# - Run unit tests and UI tests
+# - Use code quality tools (SwiftLint, swift-format)
+# - Access pre-installed dependencies for faster iterations
+
 # Automatically run the setup steps when they are changed to allow for easy validation
 on:
   workflow_dispatch:
@@ -55,7 +64,7 @@ jobs:
       - name: Run Swift Package Tests
         run: |
           echo "Running Swift Package tests..."
-          swift test || true
+          swift test --enable-code-coverage || echo "Tests failed but continuing setup"
           
       - name: Setup iOS Simulator
         run: |
