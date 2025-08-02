@@ -44,6 +44,7 @@ public final class SubscriptionManager: ObservableObject {
     private let subscriptionValidator: SubscriptionValidating
     private let validateSubscriptionUseCase: ValidateSubscriptionUseCaseProtocol
     private let authManager: AuthManager
+    private let coordinationHub: CoordinationHub
     private let logger: SyncLoggerProtocol?
     
     // MARK: - Configuration
@@ -64,6 +65,7 @@ public final class SubscriptionManager: ObservableObject {
         subscriptionValidator: SubscriptionValidating,
         validateSubscriptionUseCase: ValidateSubscriptionUseCaseProtocol,
         authManager: AuthManager,
+        coordinationHub: CoordinationHub = CoordinationHub.shared,
         logger: SyncLoggerProtocol? = nil,
         enableCaching: Bool = true,
         cacheExpirationInterval: TimeInterval = 300, // 5 minutes
@@ -72,6 +74,7 @@ public final class SubscriptionManager: ObservableObject {
         self.subscriptionValidator = subscriptionValidator
         self.validateSubscriptionUseCase = validateSubscriptionUseCase
         self.authManager = authManager
+        self.coordinationHub = coordinationHub
         self.logger = logger
         self.enableCaching = enableCaching
         self.cacheExpirationInterval = cacheExpirationInterval
@@ -385,6 +388,13 @@ public final class SubscriptionManager: ObservableObject {
             self.currentTier = result.tier
             self.hasActiveSubscription = result.isValid && !result.isExpired
         }
+        
+        // Publish subscription change through coordination hub
+        coordinationHub.publishSubscriptionChanged(
+            tier: result.tier,
+            isValid: result.isValid && !result.isExpired,
+            features: result.availableFeatures
+        )
         
         logger?.debug("SubscriptionManager: Updated subscription status - tier: \(result.tier), valid: \(result.isValid)")
     }

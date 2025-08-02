@@ -43,6 +43,9 @@ public final class SyncManager: ObservableObject {
     private let startSyncUseCase: StartSyncUseCaseProtocol
     private let authManager: AuthManager
     private let conflictResolver: ConflictResolvable?
+    private let coordinationHub: CoordinationHub
+    private let modelRegistry: ModelRegistryService
+    private let syncScheduler: SyncSchedulerService
     private let logger: SyncLoggerProtocol?
     
     // MARK: - Configuration
@@ -56,7 +59,6 @@ public final class SyncManager: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private var syncTimer: Timer?
-    private var registeredModels: Set<String> = []
     private let syncQueue = DispatchQueue(label: "sync.manager.operations", qos: .userInitiated)
     
     // Active operation tracking
@@ -69,6 +71,9 @@ public final class SyncManager: ObservableObject {
         startSyncUseCase: StartSyncUseCaseProtocol,
         authManager: AuthManager,
         conflictResolver: ConflictResolvable? = nil,
+        coordinationHub: CoordinationHub = CoordinationHub.shared,
+        modelRegistry: ModelRegistryService = ModelRegistryService.shared,
+        syncScheduler: SyncSchedulerService = SyncSchedulerService.shared,
         logger: SyncLoggerProtocol? = nil,
         syncPolicy: SyncPolicy = .balanced,
         enableAutoSync: Bool = true,
@@ -79,6 +84,9 @@ public final class SyncManager: ObservableObject {
         self.startSyncUseCase = startSyncUseCase
         self.authManager = authManager
         self.conflictResolver = conflictResolver
+        self.coordinationHub = coordinationHub
+        self.modelRegistry = modelRegistry
+        self.syncScheduler = syncScheduler
         self.logger = logger
         self.syncPolicy = syncPolicy
         self.enableAutoSync = enableAutoSync
@@ -97,6 +105,9 @@ public final class SyncManager: ObservableObject {
         
         // Observe authentication state
         observeAuthenticationState()
+        
+        // Observe coordination events
+        observeCoordinationEvents()
         
         // Setup auto sync if enabled
         if enableAutoSync {
@@ -134,7 +145,7 @@ public final class SyncManager: ObservableObject {
             }
             
             // Start full sync
-            let result = try await startSyncUseCase.startFullSync(for: user, using: syncPolicy)
+            let result = try await syncScheduler.triggerImmediateSync(for: user)
             
             await processSyncResult(result)
             logger?.info("SyncManager: Full sync completed successfully")
@@ -163,10 +174,9 @@ public final class SyncManager: ObservableObject {
         await addActiveOperation(T.tableName, operationID: operationID)
         
         do {
-            let result = try await startSyncUseCase.startIncrementalSync(
+            let result = try await syncScheduler.triggerModelSync(
                 for: entityType,
-                user: user,
-                using: syncPolicy
+                user: user
             )
             
             await removeActiveOperation(T.tableName)
@@ -216,22 +226,24 @@ public final class SyncManager: ObservableObject {
     /// Register a model type for synchronization
     /// - Parameter modelType: Type of model to register
     public func registerModel<T: Syncable>(_ modelType: T.Type) {
-        let tableName = T.tableName
-        registeredModels.insert(tableName)
-        logger?.debug("SyncManager: Registered model \(tableName) for sync")
+        do {
+            _ = try modelRegistry.registerModel(modelType)
+            logger?.debug("SyncManager: Registered model \(T.tableName) for sync")
+        } catch {
+            logger?.error("SyncManager: Failed to register model \(T.tableName): \(error)")
+        }
     }
     
     /// Unregister a model type from synchronization
     /// - Parameter modelType: Type of model to unregister
     public func unregisterModel<T: Syncable>(_ modelType: T.Type) {
-        let tableName = T.tableName
-        registeredModels.remove(tableName)
-        logger?.debug("SyncManager: Unregistered model \(tableName) from sync")
+        _ = modelRegistry.unregisterModel(modelType)
+        logger?.debug("SyncManager: Unregistered model \(T.tableName) from sync")
     }
     
     /// Get all registered model types
     public var registeredModelTypes: Set<String> {
-        registeredModels
+        modelRegistry.allTableNames
     }
     
     // MARK: - Conflict Resolution
@@ -401,6 +413,13 @@ public final class SyncManager: ObservableObject {
             self.isSyncing = false
             self.syncProgress = 1.0
         }
+        
+        // Publish sync state change through coordination hub
+        coordinationHub.publishSyncStateChanged(
+            syncState: result.success ? .completed : .failed,
+            isSyncing: false,
+            progress: 1.0
+        )
     }
     
     private func handleSyncError(_ error: SyncError) async {
@@ -463,10 +482,14 @@ public final class SyncManager: ObservableObject {
     private func updateUnresolvedConflictsCount() async {
         var totalConflicts = 0
         
-        // In real implementation, this would use the ModelRegistry
-        // to get actual types and check conflicts for each registered model
-        // For now, just set to 0 as we don't have the type registry implemented
-        totalConflicts = 0
+        // Use the ModelRegistry to get registered models and check conflicts
+        let registeredTableNames = modelRegistry.allTableNames
+        
+        for tableName in registeredTableNames {
+            // In real implementation, this would check conflicts for each registered model
+            // For now, we'll simulate by setting to 0
+            // TODO: Implement actual conflict counting using repository
+        }
         
         await MainActor.run {
             self.unresolvedConflictsCount = totalConflicts
@@ -486,6 +509,57 @@ public final class SyncManager: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    private func observeCoordinationEvents() {
+        // Listen for network state changes
+        coordinationHub.networkEventPublisher
+            .sink { [weak self] event in
+                Task { [weak self] in
+                    await self?.handleNetworkEvent(event)
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Listen for subscription changes
+        coordinationHub.subscriptionEventPublisher
+            .sink { [weak self] event in
+                Task { [weak self] in
+                    await self?.handleSubscriptionEvent(event)
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func handleNetworkEvent(_ event: CoordinationEvent) async {
+        switch event.type {
+        case .networkStateChanged:
+            if let isConnected = event.data["isConnected"] as? Bool {
+                if isConnected && !isSyncing && isSyncEnabled {
+                    // Network reconnected, resume sync if needed
+                    logger?.debug("SyncManager: Network reconnected, checking if sync should resume")
+                    try? await startSync()
+                }
+            }
+        case .offlineModeActivated:
+            await pauseSync()
+        case .onlineModeActivated:
+            if isSyncEnabled && !isSyncing {
+                try? await resumeSync()
+            }
+        default:
+            break
+        }
+    }
+    
+    private func handleSubscriptionEvent(_ event: CoordinationEvent) async {
+        switch event.type {
+        case .subscriptionChanged:
+            // Subscription changed, might affect sync capabilities
+            logger?.debug("SyncManager: Subscription changed, may affect sync features")
+        default:
+            break
+        }
     }
     
     // MARK: - Cleanup

@@ -38,6 +38,7 @@ public final class AuthManager: ObservableObject {
     private let authRepository: AuthRepositoryProtocol
     private let authUseCase: AuthenticateUserUseCaseProtocol
     private let subscriptionValidator: SubscriptionValidating
+    private let coordinationHub: CoordinationHub
     private let logger: SyncLoggerProtocol?
     
     // MARK: - Configuration
@@ -57,6 +58,7 @@ public final class AuthManager: ObservableObject {
         authRepository: AuthRepositoryProtocol,
         authUseCase: AuthenticateUserUseCaseProtocol,
         subscriptionValidator: SubscriptionValidating,
+        coordinationHub: CoordinationHub = CoordinationHub.shared,
         logger: SyncLoggerProtocol? = nil,
         enableAutoTokenRefresh: Bool = true,
         tokenRefreshThreshold: TimeInterval = 300 // 5 minutes
@@ -64,6 +66,7 @@ public final class AuthManager: ObservableObject {
         self.authRepository = authRepository
         self.authUseCase = authUseCase
         self.subscriptionValidator = subscriptionValidator
+        self.coordinationHub = coordinationHub
         self.logger = logger
         self.enableAutoTokenRefresh = enableAutoTokenRefresh
         self.tokenRefreshThreshold = tokenRefreshThreshold
@@ -292,6 +295,9 @@ public final class AuthManager: ObservableObject {
             self.lastError = nil
         }
         
+        // Coordinate authentication change across managers
+        await coordinationHub.coordinateAuthenticationChange(user)
+        
         // Check token refresh needs
         if user.needsTokenRefresh && enableAutoTokenRefresh {
             Task {
@@ -307,6 +313,9 @@ public final class AuthManager: ObservableObject {
             self.authStatus = .unauthenticated
             self.lastError = nil
         }
+        
+        // Coordinate authentication change across managers
+        await coordinationHub.coordinateAuthenticationChange(nil)
         
         // Cancel token refresh timer
         tokenRefreshTimer?.invalidate()
