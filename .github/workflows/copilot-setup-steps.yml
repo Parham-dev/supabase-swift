@@ -34,11 +34,14 @@ jobs:
         with:
           # Enable LFS if you use large files
           lfs: false
+          # Use a different path to avoid cyclic dependency issues
+          path: swift-supabase-sync-project
           
       - name: Display working directory info
         run: |
           echo "Current directory: $(pwd)"
-          echo "Directory name: $(basename $(pwd))"
+          echo "Checkout directory: swift-supabase-sync-project"
+          cd swift-supabase-sync-project
           echo "Package.swift location:"
           find . -name "Package.swift" -type f | head -5
           echo "Package name from Package.swift:"
@@ -53,10 +56,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            .build
+            swift-supabase-sync-project/.build
             ~/Library/Developer/Xcode/DerivedData
             ~/.swiftpm
-          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          key: ${{ runner.os }}-spm-${{ hashFiles('swift-supabase-sync-project/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-spm-
             
@@ -64,12 +67,14 @@ jobs:
         run: |
           echo "Setting up Swift environment..."
           # Set environment variables for Swift Package Manager
-          echo "SWIFTPM_PACKAGE_ROOT=$GITHUB_WORKSPACE" >> $GITHUB_ENV
-          echo "Package root: $GITHUB_WORKSPACE"
+          echo "SWIFTPM_PACKAGE_ROOT=$GITHUB_WORKSPACE/swift-supabase-sync-project" >> $GITHUB_ENV
+          echo "WORKING_DIR=$GITHUB_WORKSPACE/swift-supabase-sync-project" >> $GITHUB_ENV
+          echo "Package root: $GITHUB_WORKSPACE/swift-supabase-sync-project"
           
       - name: Clean build artifacts
         run: |
           echo "Cleaning any existing build artifacts..."
+          cd $WORKING_DIR
           rm -rf .build
           rm -rf .swiftpm
           rm -rf ~/Library/Developer/Xcode/DerivedData/*-*
@@ -78,19 +83,19 @@ jobs:
       - name: Resolve Swift Package dependencies
         run: |
           echo "Resolving Swift Package Manager dependencies..."
-          cd $GITHUB_WORKSPACE
+          cd $WORKING_DIR
           swift package resolve
           
       - name: Build Swift Package
         run: |
           echo "Building Swift Package..."
-          cd $GITHUB_WORKSPACE
+          cd $WORKING_DIR
           swift build -v
           
       - name: Run Swift Package Tests
         run: |
           echo "Running Swift Package tests..."
-          cd $GITHUB_WORKSPACE
+          cd $WORKING_DIR
           swift test -v --enable-code-coverage || echo "Tests failed but continuing setup"
           
       - name: Setup iOS Simulator
@@ -109,6 +114,7 @@ jobs:
       - name: Build iOS App (Xcode)
         run: |
           echo "Building iOS app with Xcode..."
+          cd $WORKING_DIR
           xcodebuild -scheme SupabaseSwift \
             -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
             -configuration Debug \
@@ -141,7 +147,7 @@ jobs:
           echo "SWIFT_VERSION=$(swift --version | head -n 1)" >> $GITHUB_ENV
           echo "XCODE_VERSION=15.2" >> $GITHUB_ENV
           echo "IOS_SIMULATOR=iPhone 15 Pro" >> $GITHUB_ENV
-          echo "PROJECT_ROOT=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+          echo "PROJECT_ROOT=$WORKING_DIR" >> $GITHUB_ENV
           
       - name: Verify setup
         run: |
@@ -151,13 +157,14 @@ jobs:
           echo "Available simulators:"
           xcrun simctl list devices
           echo "Project structure:"
-          ls -la
+          cd $WORKING_DIR && ls -la
           echo "Swift Package dependencies resolved:"
-          ls -la .build || true
+          cd $WORKING_DIR && ls -la .build || true
           
       - name: Create helper commands file
         run: |
           echo "Creating helper commands for Copilot..."
+          cd $WORKING_DIR
           cat > copilot-commands.md << 'EOF'
           # Copilot Helper Commands for Swift/iOS Development
 
