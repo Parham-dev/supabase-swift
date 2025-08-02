@@ -58,6 +58,11 @@ public final class SupabaseAuthDataSource {
             let user = try await convertToUser(from: response)
             try await storeAuthTokens(accessToken: response.accessToken, refreshToken: response.refreshToken)
             
+            // Set the auth token on the HTTP client for subsequent requests
+            if let accessToken = response.accessToken {
+                await httpClient.setAuthToken(accessToken)
+            }
+            
             return user
             
         } catch {
@@ -96,6 +101,9 @@ public final class SupabaseAuthDataSource {
             let user = try await convertToUser(from: response)
             if let accessToken = response.accessToken, let refreshToken = response.refreshToken {
                 try await storeAuthTokens(accessToken: accessToken, refreshToken: refreshToken)
+                
+                // Set the auth token on the HTTP client for subsequent requests
+                await httpClient.setAuthToken(accessToken)
             }
             
             return user
@@ -112,6 +120,9 @@ public final class SupabaseAuthDataSource {
             let request = RequestBuilder.post("/auth/v1/logout", baseURL: baseURL)
             try await httpClient.execute(request)
             try await clearStoredTokens()
+            
+            // Clear the auth token from the HTTP client
+            await httpClient.setAuthToken(nil)
         } catch {
             throw AuthDataSourceError.signOutFailed(error.localizedDescription)
         }

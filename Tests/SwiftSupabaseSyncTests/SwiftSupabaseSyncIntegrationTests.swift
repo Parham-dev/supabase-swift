@@ -245,7 +245,13 @@ struct SwiftSupabaseSyncIntegrationTests {
         
         // First sign in
         _ = try? await auth.signUp(email: testEmail, password: testPassword)
-        _ = try? await auth.signIn(email: testEmail, password: testPassword)
+        let signInResult = try await auth.signIn(email: testEmail, password: testPassword)
+        
+        // Verify sign in was successful
+        #expect(signInResult.isSuccess)
+        
+        // Wait for state to propagate
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Ensure we're signed in
         guard auth.isAuthenticated else {
@@ -253,8 +259,17 @@ struct SwiftSupabaseSyncIntegrationTests {
             return
         }
         
+        print("🔍 [SIGN OUT TEST] Successfully signed in, now testing sign out...")
+        print("   Current state - isAuthenticated: \(auth.isAuthenticated)")
+        
         // Sign out
-        try await auth.signOut()
+        let signOutResult = try await auth.signOut()
+        
+        // Verify sign out was successful
+        #expect(signOutResult == true)
+        
+        // Wait for state to propagate
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Verify signed out state
         #expect(!auth.isAuthenticated)
@@ -262,6 +277,7 @@ struct SwiftSupabaseSyncIntegrationTests {
         #expect(auth.authenticationStatus == .signedOut)
         
         print("✅ Sign out successful")
+        print("   Final state - isAuthenticated: \(auth.isAuthenticated)")
     }
     
     @Test("Invalid credentials fail appropriately")
