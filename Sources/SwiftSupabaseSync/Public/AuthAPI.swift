@@ -455,10 +455,16 @@ public final class AuthAPI: ObservableObject {
     
     /// Setup bindings between internal AuthManager and public properties
     private func setupBindings() {
+        print("🔍 [AuthAPI] Setting up bindings")
+        
         // Bind authentication state
         authManager.$isAuthenticated
             .receive(on: DispatchQueue.main)
-            .assign(to: \.isAuthenticated, on: self)
+            .sink { [weak self] isAuthenticated in
+                print("🔍 [AuthAPI] Received isAuthenticated update: \(isAuthenticated)")
+                self?.isAuthenticated = isAuthenticated
+                print("🔍 [AuthAPI] AuthAPI isAuthenticated set to: \(self?.isAuthenticated ?? false)")
+            }
             .store(in: &cancellables)
         
         authManager.$isLoading

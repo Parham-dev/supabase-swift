@@ -49,7 +49,8 @@ public final class SupabaseAuthDataSource {
                 "password": password
             ])
             let request = RequestBuilder.post("/auth/v1/token", baseURL: baseURL)
-                .header("grant_type", "password")
+                .query("grant_type", "password")
+                .header("Content-Type", "application/json")
                 .rawBody(requestData)
             
             let response: AuthResponse = try await httpClient.execute(request, expecting: AuthResponse.self)
@@ -295,6 +296,7 @@ public struct AuthResponse: Codable {
     public let accessToken: String?
     public let refreshToken: String?
     public let expiresAt: Int?
+    public let expiresIn: Int?
     public let tokenType: String?
     public let user: AuthUser
     
@@ -302,6 +304,7 @@ public struct AuthResponse: Codable {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
         case expiresAt = "expires_at"
+        case expiresIn = "expires_in"
         case tokenType = "token_type"
         case user
     }
@@ -323,13 +326,31 @@ public struct AuthUser: Codable {
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
+        
+        // Handle both string and UUID formats for id
+        if let idString = try? container.decode(String.self, forKey: .id) {
+            guard let uuid = UUID(uuidString: idString) else {
+                throw DecodingError.dataCorruptedError(forKey: .id, in: container, debugDescription: "Invalid UUID string: \(idString)")
+            }
+            id = uuid
+        } else {
+            id = try container.decode(UUID.self, forKey: .id)
+        }
+        
         email = try container.decode(String.self, forKey: .email)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
         
-        if let metadataData = try container.decodeIfPresent(Data.self, forKey: .userMetadata) {
-            userMetadata = try JSONSerialization.jsonObject(with: metadataData) as? [String: Any]
+        // Handle user_metadata - for now, just decode as a basic dictionary
+        // Note: This is a simplified approach for the common case where metadata contains strings
+        if container.contains(.userMetadata) {
+            do {
+                userMetadata = try container.decode([String: String].self, forKey: .userMetadata)
+            } catch {
+                // If it's not a simple string dictionary, skip it for now
+                print("⚠️ Could not decode user_metadata, using nil")
+                userMetadata = nil
+            }
         } else {
             userMetadata = nil
         }
@@ -365,13 +386,29 @@ public struct UserResponse: Codable {
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(UUID.self, forKey: .id)
+        
+        // Handle both string and UUID formats for id
+        if let idString = try? container.decode(String.self, forKey: .id) {
+            guard let uuid = UUID(uuidString: idString) else {
+                throw DecodingError.dataCorruptedError(forKey: .id, in: container, debugDescription: "Invalid UUID string: \(idString)")
+            }
+            id = uuid
+        } else {
+            id = try container.decode(UUID.self, forKey: .id)
+        }
+        
         email = try container.decode(String.self, forKey: .email)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
         
-        if let metadataData = try container.decodeIfPresent(Data.self, forKey: .userMetadata) {
-            userMetadata = try JSONSerialization.jsonObject(with: metadataData) as? [String: Any]
+        // Handle user_metadata similar to AuthUser
+        if container.contains(.userMetadata) {
+            do {
+                userMetadata = try container.decode([String: String].self, forKey: .userMetadata)
+            } catch {
+                print("⚠️ Could not decode user_metadata in UserResponse, using nil")
+                userMetadata = nil
+            }
         } else {
             userMetadata = nil
         }
