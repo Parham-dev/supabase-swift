@@ -215,7 +215,7 @@ public final class SchemaManager: ObservableObject {
     public func validateAllSchemas() async {
         logger?.info("SchemaManager: Validating all schemas")
         
-        var allValid = true
+        let allValid = true
         
         for tableName in registeredModels.keys {
             if modelRegistryService.getRegistration(for: tableName) != nil {
@@ -298,7 +298,7 @@ public final class SchemaManager: ObservableObject {
         
         logger?.info("SchemaManager: Checking migration needs for all schemas")
         
-        var migrationErrors: [String: Error] = [:]
+        let migrationErrors: [String: Error] = [:]
         
         for tableName in registeredModels.keys {
             if modelRegistryService.getRegistration(for: tableName) != nil {

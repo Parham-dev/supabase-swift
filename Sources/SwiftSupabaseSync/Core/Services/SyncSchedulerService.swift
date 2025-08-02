@@ -71,8 +71,10 @@ public final class SyncSchedulerService: ObservableObject {
         self.startSyncUseCase = startSyncUseCase ?? DefaultStartSyncUseCase()
         self.logger = logger
         
-        setupObservers()
-        startSchedulingTimer()
+        Task { @MainActor in
+            setupObservers()
+            startSchedulingTimer()
+        }
     }
     
     // MARK: - Schedule Management

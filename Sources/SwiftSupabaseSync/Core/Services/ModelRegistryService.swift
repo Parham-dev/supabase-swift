@@ -159,7 +159,7 @@ public final class ModelRegistryService: ObservableObject {
         var discoveredCount = 0
         
         // Get all model types from container
-        let schema = container.schema
+        _ = container.schema
         
         // SwiftData Schema structure may vary, using simplified approach
         // For now, skip automatic discovery and just return 0
@@ -191,8 +191,6 @@ public final class ModelRegistryService: ObservableObject {
                     registeredModels[tableName] = registration
                     discoveredCount += 1
                 }
-            } catch {
-                await setError(.discoveryFailed(modelName, error))
             }
         }
         

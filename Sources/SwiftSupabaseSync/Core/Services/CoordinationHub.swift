@@ -31,6 +31,9 @@ public final class CoordinationHub: ObservableObject {
     
     // MARK: - Private Properties
     
+    /// Event handling state
+    private var eventHandlingSetup: Bool = false
+    
     private let eventSubject = PassthroughSubject<CoordinationEvent, Never>()
     private var cancellables = Set<AnyCancellable>()
     private var eventHandlers: [CoordinationEventType: [(CoordinationEvent) async -> Void]] = [:]
@@ -74,7 +77,10 @@ public final class CoordinationHub: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        setupEventHandling()
+        Task { @MainActor in
+            setupEventHandling()
+            eventHandlingSetup = true
+        }
     }
     
     // MARK: - Event Publishing
@@ -83,6 +89,8 @@ public final class CoordinationHub: ObservableObject {
     /// - Parameter event: Event to publish
     public func publish(_ event: CoordinationEvent) {
         Task {
+            await ensureEventHandlingSetup()
+            
             await MainActor.run {
                 self.activeEvents.append(event)
                 self.coordinationState = .coordinating
@@ -99,6 +107,16 @@ public final class CoordinationHub: ObservableObject {
                 if self.activeEvents.isEmpty {
                     self.coordinationState = .idle
                 }
+            }
+        }
+    }
+    
+    /// Ensure event handling is properly set up
+    private func ensureEventHandlingSetup() async {
+        await MainActor.run {
+            if !eventHandlingSetup {
+                setupEventHandling()
+                eventHandlingSetup = true
             }
         }
     }

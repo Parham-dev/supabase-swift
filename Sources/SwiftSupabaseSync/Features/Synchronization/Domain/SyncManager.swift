@@ -480,12 +480,12 @@ public final class SyncManager: ObservableObject {
     }
     
     private func updateUnresolvedConflictsCount() async {
-        var totalConflicts = 0
+        let totalConflicts = 0
         
         // Use the ModelRegistry to get registered models and check conflicts
         let registeredTableNames = modelRegistry.allTableNames
         
-        for tableName in registeredTableNames {
+        for _ in registeredTableNames {
             // In real implementation, this would check conflicts for each registered model
             // For now, we'll simulate by setting to 0
             // TODO: Implement actual conflict counting using repository
@@ -538,14 +538,14 @@ public final class SyncManager: ObservableObject {
                 if isConnected && !isSyncing && isSyncEnabled {
                     // Network reconnected, resume sync if needed
                     logger?.debug("SyncManager: Network reconnected, checking if sync should resume")
-                    try? await startSync()
+                    _ = try? await startSync()
                 }
             }
         case .offlineModeActivated:
             await pauseSync()
         case .onlineModeActivated:
             if isSyncEnabled && !isSyncing {
-                try? await resumeSync()
+                _ = try? await resumeSync()
             }
         default:
             break
