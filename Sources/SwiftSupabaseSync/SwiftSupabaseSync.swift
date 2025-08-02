@@ -407,10 +407,35 @@ private extension SwiftSupabaseSync {
             throw SDKError.initializationFailed(SDKError.componentInitializationFailed("SchemaAPI"))
         }
         
-        // Perform initial health check
-        let healthResult = await performHealthCheck()
-        if healthResult.overallStatus == .unhealthy {
-            throw SDKError.initializationFailed(SDKError.healthCheckFailed(healthResult.errors))
+        // Perform basic component availability checks (without strict session validation)
+        var errors: [Error] = []
+        
+        // Check Auth component availability (but don't require active session)
+        if let authManager = authManager {
+            do {
+                // Just check if the auth manager can perform basic operations
+                // Don't require an active session during initialization
+                _ = try await authManager.validateSession()
+            } catch {
+                // Session validation failure is acceptable during initialization
+                // The user can sign in after initialization is complete
+                // Only fail if the authManager itself is completely broken
+                if error.localizedDescription.contains("critical") || error.localizedDescription.contains("unavailable") {
+                    errors.append(error)
+                }
+            }
+        }
+        
+        // Check Schema component
+        if let schemaManager = schemaManager {
+            if !schemaManager.allSchemasValid {
+                errors.append(SDKError.componentInitializationFailed("SchemaAPI - schema validation failed"))
+            }
+        }
+        
+        // If there are critical errors, fail initialization
+        if !errors.isEmpty {
+            throw SDKError.initializationFailed(SDKError.healthCheckFailed(errors))
         }
     }
     

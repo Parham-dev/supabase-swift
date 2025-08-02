@@ -15,21 +15,39 @@ struct EnvironmentReader {
     static func loadEnvFile() -> [String: String] {
         var envVars: [String: String] = [:]
         
-        // Try to find .env file in project root
+        // Try to find .env file in various locations
+        // Xcode often runs tests from DerivedData, so we need to search more paths
         let possiblePaths = [
-            ".env",
-            "../.env",
-            "../../.env",
-            "../../../.env"
+            ".env",                           // Current directory
+            "../.env",                        // Parent directory
+            "../../.env",                     // Grandparent directory
+            "../../../.env",                  // Great-grandparent directory
+            "../../../../.env",               // For deep Xcode paths
+            "../../../../../.env",            // Even deeper
+            "../../../../../../.env",         // Very deep Xcode paths
         ]
         
-        for path in possiblePaths {
+        // Also try absolute path to project root (more reliable for Xcode)
+        let projectRootPaths = findProjectRootPaths()
+        
+        // Combine relative and absolute paths
+        let allPaths = possiblePaths + projectRootPaths
+        
+        for path in allPaths {
             if let envPath = findEnvFile(relativePath: path) {
                 envVars = parseEnvFile(at: envPath)
                 if !envVars.isEmpty {
                     print("📄 Loaded environment variables from: \(envPath)")
                     break
                 }
+            }
+        }
+        
+        if envVars.isEmpty {
+            print("⚠️ No .env file found. Searched paths:")
+            for path in allPaths {
+                let fullPath = findEnvFile(relativePath: path) ?? "Not found: \(path)"
+                print("   - \(fullPath)")
             }
         }
         
@@ -46,6 +64,39 @@ struct EnvironmentReader {
         }
         
         return nil
+    }
+    
+    /// Find potential project root paths by looking for characteristic files
+    private static func findProjectRootPaths() -> [String] {
+        var projectPaths: [String] = []
+        
+        // Look for project indicators (Package.swift, .git, etc.)
+        let projectIndicators = ["Package.swift", ".git", "README.md"]
+        let currentDirectory = FileManager.default.currentDirectoryPath
+        
+        // Search up the directory tree
+        var searchPath = currentDirectory
+        for _ in 0..<10 { // Limit search depth
+            for indicator in projectIndicators {
+                let indicatorPath = (searchPath as NSString).appendingPathComponent(indicator)
+                if FileManager.default.fileExists(atPath: indicatorPath) {
+                    let envPath = (searchPath as NSString).appendingPathComponent(".env")
+                    if !projectPaths.contains(envPath) {
+                        projectPaths.append(envPath)
+                    }
+                    break
+                }
+            }
+            
+            // Move up one directory
+            let parentPath = (searchPath as NSString).deletingLastPathComponent
+            if parentPath == searchPath {
+                break // Reached root
+            }
+            searchPath = parentPath
+        }
+        
+        return projectPaths
     }
     
     /// Parse .env file and return key-value pairs

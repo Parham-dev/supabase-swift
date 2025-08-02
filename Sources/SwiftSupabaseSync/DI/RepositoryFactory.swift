@@ -337,6 +337,9 @@ public final class RepositoryFactory {
     /// Global testing data source for dependency injection in tests
     public static var testingLocalDataSource: LocalDataSource?
     
+    /// Global testing keychain service for dependency injection in tests
+    public static var testingKeychainService: KeychainServiceProtocol?
+    
     /// Create all data sources and register them in the container
     /// - Throws: DIError if any data source cannot be created
     public func registerAllDataSources() throws {
@@ -368,7 +371,27 @@ public final class RepositoryFactory {
         }
         
         container.register(KeychainService.self, lifetime: .singleton) { _ in
-            self.createKeychainService()
+            // Check if we have a test KeychainService available (for testing)
+            if let testKeychainService = RepositoryFactory.testingKeychainService {
+                // If it's already a KeychainService, return it directly
+                if let keychainService = testKeychainService as? KeychainService {
+                    return keychainService
+                }
+                // Otherwise, create a wrapper adapter (this shouldn't normally happen)
+                // Since MockKeychainService conforms to KeychainServiceProtocol but we need KeychainService
+                // We'll handle this case differently by registering the protocol separately
+            }
+            return self.createKeychainService()
+        }
+        
+        // Also register the protocol for direct protocol-based injection
+        container.register(KeychainServiceProtocol.self, lifetime: .singleton) { container in
+            // Check if we have a test KeychainService available (for testing)
+            if let testKeychainService = RepositoryFactory.testingKeychainService {
+                return testKeychainService
+            }
+            // Otherwise, return the concrete KeychainService which conforms to the protocol
+            return try container.resolve(KeychainService.self)
         }
         
         container.register(SupabaseClient.self, lifetime: .singleton) { _ in
