@@ -202,6 +202,13 @@ Create a seamless, offline-first synchronization solution that enables iOS/macOS
 
 ### Phase 2: Core Features (Steps 4-7) - Detailed Implementation
 
+**📝 Important Note on Step Ordering**: 
+Steps 5-7 have been reordered to follow proper dependency flow:
+- **Step 5** (Feature Managers) must come before Step 6 (Presentation) and Step 7 (Public API) because:
+  - Presentation layer ViewModels and Publishers need to observe Manager states
+  - Public API acts as a facade over Feature Managers
+  - This follows the dependency rule: Core → Features → Presentation → Public API
+
 #### 🔐 Step 4: Repository Layer & Dependency Injection
 **Status: PENDING** 🔄  
 **Timeline**: Week 6-7  
@@ -256,208 +263,205 @@ Create a seamless, offline-first synchronization solution that enables iOS/macOS
 - [x] No stub implementations or notImplemented errors (except non-critical remote schema update)
 - [x] Production-ready with full Phase 2 + Phase 3 functionality
 
-**🔄 4.2 Dependency Injection Container (Week 6-7)** - **PENDING**
+**✅ 4.2 Dependency Injection Container (Week 6-7)** - **COMPLETED** ✨
 ```swift
 // Clean dependency management
-- DIContainer.swift: Main dependency injection container
-- ServiceLocator.swift: Service registration and resolution
-- RepositoryFactory.swift: Repository instance creation
-- ConfigurationProvider.swift: Environment-specific configurations
+✅ DICore.swift: Main dependency injection container with full functionality (COMPLETED)
+✅ ServiceLocator.swift: Service registration and resolution with property wrappers (COMPLETED)
+✅ RepositoryFactory.swift: Repository instance creation with all dependencies (COMPLETED)
+✅ ConfigurationProvider.swift: Environment-specific configurations with multiple sources (COMPLETED)
+✅ DependencyInjectionSetup.swift: Main setup class for complete DI configuration (COMPLETED)
 ```
 
-**Key Features to Implement**:
-- [x] **DIContainer**: Thread-safe service registration and resolution
-- [x] **Service Lifetimes**: Singleton, scoped, and transient service management
-- [x] **Configuration**: Environment-specific settings (dev, staging, production)
-- [x] **Factory Pattern**: Clean service instantiation with proper dependency injection
-- [x] **Testing Support**: Mock service registration for unit testing
+**Completed Features**:
+- [x] **DIContainer**: Thread-safe service registration and resolution with recursive lock support
+- [x] **Service Lifetimes**: Singleton, scoped, and transient service management fully implemented
+- [x] **Configuration**: Environment-specific settings (dev, staging, production, testing) with plist and env var support
+- [x] **Factory Pattern**: Clean service instantiation with proper dependency injection and circular dependency detection
+- [x] **Testing Support**: Mock service registration for unit testing with dedicated test configuration
+- [x] **Property Wrappers**: @Inject, @InjectOptional, and @InjectScoped for automatic dependency resolution
+- [x] **SwiftUI Integration**: View modifiers for seamless DI setup in SwiftUI apps
+- [x] **Global Functions**: Convenient global setup and resolution functions
 
-**Success Criteria**:
-- All use cases can resolve dependencies cleanly
-- Repositories provide clean abstraction over data sources
-- Configuration is environment-aware and secure
-- Comprehensive error handling across all layers
+**Success Criteria**: ✅ **ALL COMPLETED**
+- [x] All use cases can resolve dependencies cleanly through RepositoryFactory
+- [x] Repositories provide clean abstraction over data sources with full implementation
+- [x] Configuration is environment-aware and secure with multiple configuration sources
+- [x] Comprehensive error handling across all layers with DIError types
+- [x] Thread-safe operations with proper locking mechanisms
+- [x] Circular dependency detection and prevention
 
 ---
 
-#### 🚀 Step 5: Public API & SDK Integration
+#### 🏗️ Step 5: Feature Module Implementation
 **Status: PENDING** 🔄  
 **Timeline**: Week 8-9  
-**Objective**: Create the main SDK interface that developers will use to integrate SwiftSupabaseSync
+**Objective**: Implement core feature managers that coordinate business logic and provide the foundation for the public API
 
 **Detailed Implementation Plan**:
 
-**🔄 5.1 Core SDK Interface (Week 8)** - **PENDING**
+**🔄 5.1 Core Feature Managers (Week 8)** - **PENDING**
 ```swift
-// Main developer-facing API
-- SwiftSupabaseSync.swift: Enhanced main SDK class with configuration
-- SyncManager.swift: Primary sync coordination interface
-- AuthManager.swift: Authentication management interface
-- ConfigurationBuilder.swift: Fluent configuration API
+// Domain layer managers that coordinate business logic
+- AuthManager.swift: Authentication state and workflow coordination
+- SyncManager.swift: Synchronization orchestration and state management
+- SchemaManager.swift: Database schema management and model registration
+- SubscriptionManager.swift: Feature gating and subscription validation
 ```
 
 **Key Features to Implement**:
-- [x] **SwiftSupabaseSync Configuration**: 
-  ```swift
-  SwiftSupabaseSync.configure {
-      supabaseURL("your-url")
-      supabaseKey("your-key")
-      syncPolicy(.balanced)
-      conflictResolution(.lastWriteWins)
-      enableRealtime(true)
-  }
-  ```
-- [x] **SyncManager**: Primary interface for sync operations
-  - `startSync()`, `stopSync()`, `pauseSync()`
-  - `syncModel<T: Syncable>(_: T.Type)` for model-specific sync
-  - Sync status monitoring with Combine publishers
-- [x] **AuthManager**: Clean authentication interface
-  - `signIn(email:password:)`, `signUp(email:password:)`
-  - `signOut()`, `currentUser`, `isAuthenticated`
-  - Reactive auth state with `@Published` properties
+- [ ] **AuthManager**: 
+  - Session management with automatic token refresh
+  - User state persistence and restoration
+  - Integration with AuthRepository and use cases
+  - Observable authentication state changes
+- [ ] **SyncManager**: 
+  - Sync lifecycle management (start, stop, pause, resume)
+  - Model-specific sync configuration
+  - Progress tracking and status reporting
+  - Integration with SyncRepository and conflict resolution
+- [ ] **SchemaManager**: 
+  - Automatic schema generation from SwiftData models
+  - Model registration and validation
+  - Schema versioning and migration support
+  - Table creation and update coordination
+- [ ] **SubscriptionManager**: 
+  - Feature availability checking
+  - Subscription status caching
+  - Pro feature enforcement
+  - Integration with ValidateSubscriptionUseCase
 
-**🔄 5.2 Feature Managers (Week 8-9)** - **PENDING**
+**🔄 5.2 Supporting Services (Week 8-9)** - **PENDING**
 ```swift
-// High-level feature coordinators
-- SchemaManager.swift: Automatic schema management
-- SubscriptionManager.swift: Pro feature validation
-- ConflictManager.swift: Conflict resolution coordination
-- RealtimeManager.swift: Real-time subscription management
+// Additional coordinators and services
+- ConflictManager.swift: Conflict resolution workflow coordination
+- RealtimeManager.swift: WebSocket connection and subscription management
+- ModelRegistry.swift: Syncable model registration and discovery
+- SyncScheduler.swift: Background sync scheduling and optimization
 ```
 
 **Key Features to Implement**:
-- [x] **SchemaManager**: Automatic table creation from Syncable models
-- [x] **SubscriptionManager**: Feature gating and subscription validation
-- [x] **ConflictManager**: User-friendly conflict resolution workflows
-- [x] **RealtimeManager**: Live data subscription management
-- [x] **Integration**: Seamless coordination between all managers
-- [x] **Error Handling**: User-friendly error messages and recovery suggestions
+- [ ] **ConflictManager**: User-friendly conflict resolution workflows
+- [ ] **RealtimeManager**: Live data subscription lifecycle management
+- [ ] **ModelRegistry**: Dynamic model discovery and registration
+- [ ] **SyncScheduler**: Intelligent sync scheduling based on app state
+- [ ] **Error Recovery**: Coordinated error handling across all managers
 
 **Success Criteria**:
-- One-line SDK setup with sensible defaults
-- Clean, SwiftUI-friendly reactive APIs
-- Comprehensive error handling with recovery suggestions
-- Developer-friendly debugging and logging
+- All managers properly integrate with repositories and use cases
+- Clean separation between business logic coordination and data access
+- Observable state changes for UI integration
+- Thread-safe operations with proper concurrency handling
+- Comprehensive error handling and recovery strategies
 
 ---
 
 #### 📊 Step 6: Presentation Layer & Reactive Publishers
 **Status: PENDING** 🔄  
 **Timeline**: Week 10-11  
-**Objective**: Create reactive publishers and view models for seamless SwiftUI integration
+**Objective**: Create reactive publishers and view models that wrap feature managers for seamless SwiftUI integration
 
 **Detailed Implementation Plan**:
 
 **🔄 6.1 Core Publishers (Week 10)** - **PENDING**
 ```swift
-// Reactive data layer for SwiftUI
-- SyncStatusPublisher.swift: Real-time sync status updates
-- AuthStatePublisher.swift: Authentication state changes
-- RealtimeDataPublisher.swift: Live data updates
-- NetworkStatusPublisher.swift: Connection state monitoring
+// Reactive wrappers around feature managers
+- SyncStatusPublisher.swift: Observes SyncManager state
+- AuthStatePublisher.swift: Observes AuthManager state
+- RealtimeDataPublisher.swift: Observes RealtimeManager updates
+- NetworkStatusPublisher.swift: Observes NetworkMonitor state
 ```
 
 **Key Features to Implement**:
-- [x] **SyncStatusPublisher**: `@Published` sync state for UI binding
-  ```swift
-  @StateObject private var syncStatus = SyncStatusPublisher()
-  // syncStatus.isConnected, syncStatus.progress, syncStatus.lastError
-  ```
-- [x] **AuthStatePublisher**: Reactive authentication state
-  ```swift
-  @StateObject private var authState = AuthStatePublisher()
-  // authState.user, authState.isAuthenticated, authState.isLoading
-  ```
-- [x] **Performance**: Efficient state updates with minimal UI refreshes
-- [x] **SwiftUI Integration**: Native support for `@StateObject` and `@ObservedObject`
+- [ ] **SyncStatusPublisher**: 
+  - Wraps SyncManager state for UI binding
+  - `@Published` properties for sync status, progress, errors
+  - Combine publishers for reactive updates
+- [ ] **AuthStatePublisher**: 
+  - Wraps AuthManager authentication state
+  - `@Published` user, isAuthenticated, isLoading
+  - Session state change notifications
+- [ ] **Integration**: Publishers observe and transform manager states
+- [ ] **Performance**: Efficient state propagation with deduplication
 
 **🔄 6.2 Feature ViewModels (Week 10-11)** - **PENDING**
 ```swift
-// SwiftUI-ready view models
-- SyncSettingsViewModel.swift: Sync configuration UI support
-- AuthenticationViewModel.swift: Login/signup form support
-- ConflictResolutionViewModel.swift: Conflict resolution UI
-- SubscriptionStatusViewModel.swift: Pro feature status display
+// SwiftUI-ready view models using managers
+- SyncSettingsViewModel.swift: Uses SyncManager for configuration
+- AuthenticationViewModel.swift: Uses AuthManager for auth flows
+- ConflictResolutionViewModel.swift: Uses ConflictManager
+- SubscriptionStatusViewModel.swift: Uses SubscriptionManager
 ```
 
 **Key Features to Implement**:
-- [x] **MVVM Pattern**: Clean separation between UI and business logic
-- [x] **Form Validation**: Built-in validation for authentication forms
-- [x] **Error Presentation**: User-friendly error messages and alerts
-- [x] **Loading States**: Proper loading indicators and progress tracking
-- [x] **Accessibility**: VoiceOver and accessibility support
+- [ ] **ViewModels use Managers**: Clean dependency on feature managers
+- [ ] **Form Handling**: Input validation and error presentation
+- [ ] **Loading States**: Proper state management during operations
+- [ ] **Error Presentation**: User-friendly error transformation
+- [ ] **Accessibility**: Full VoiceOver and Dynamic Type support
 
 **Success Criteria**:
-- Seamless SwiftUI integration with minimal boilerplate
-- Reactive UI updates reflecting real-time data changes
-- Comprehensive error handling with user-friendly messages
-- Excellent performance with efficient state management
+- ViewModels cleanly wrap manager functionality
+- Reactive UI updates through Combine publishers
+- Proper separation of concerns (UI logic vs business logic)
+- Excellent SwiftUI integration with minimal boilerplate
 
 ---
 
-#### 🏗️ Step 7: Feature Module Integration
+#### 🚀 Step 7: Public API & SDK Integration
 **Status: PENDING** 🔄  
 **Timeline**: Week 12-13  
-**Objective**: Complete the feature modules and integrate all components into a cohesive system
+**Objective**: Create the main SDK interface that provides a clean, unified API over all feature managers
 
 **Detailed Implementation Plan**:
 
-**🔄 7.1 Authentication Feature Complete (Week 12)** - **PENDING**
+**🔄 7.1 Core SDK Interface (Week 12)** - **PENDING**
 ```swift
-// Complete authentication module
-Features/Authentication/
-├── Data/
-│   └── AuthRepositoryImpl.swift: Concrete auth repository
-├── Domain/
-│   └── AuthManager.swift: Main authentication coordinator
-└── Presentation/
-    ├── AuthStatePublisher.swift: Reactive auth state
-    └── AuthenticationViewModel.swift: SwiftUI view model
+// Main developer-facing API facade
+- SwiftSupabaseSync.swift: Main SDK class with configuration
+- Configuration/ConfigurationBuilder.swift: Fluent configuration API
+- Public/SyncAPI.swift: Public sync operations interface
+- Public/AuthAPI.swift: Public authentication interface
 ```
 
-**🔄 7.2 Synchronization Feature Complete (Week 12)** - **PENDING**
+**Key Features to Implement**:
+- [ ] **SwiftSupabaseSync Main Class**: 
+  ```swift
+  SwiftSupabaseSync.configure {
+      $0.supabaseURL = "your-url"
+      $0.supabaseKey = "your-key"
+      $0.syncPolicy = .balanced
+      $0.conflictResolution = .lastWriteWins
+      $0.enableRealtime = true
+  }
+  ```
+- [ ] **Facade Pattern**: Clean API over internal managers
+- [ ] **Singleton Access**: SwiftSupabaseSync.shared for global access
+- [ ] **Manager Access**: Public properties for direct manager access
+- [ ] **Convenience Methods**: High-level operations for common tasks
+
+**🔄 7.2 Public API Components (Week 12-13)** - **PENDING**
 ```swift
-// Complete synchronization module  
-Features/Synchronization/
-├── Data/
-│   └── SyncRepositoryImpl.swift: Concrete sync repository
-├── Domain/
-│   └── SyncManager.swift: Main sync coordinator
-└── Presentation/
-    ├── SyncStatusPublisher.swift: Reactive sync state
-    └── SyncSettingsViewModel.swift: Sync configuration UI
+// Public interfaces and convenience APIs
+- Extensions/SwiftDataExtensions.swift: Syncable model helpers
+- Extensions/CombineExtensions.swift: Publisher conveniences
+- Builders/SyncPolicyBuilder.swift: Fluent sync configuration
+- Builders/ConflictResolutionBuilder.swift: Conflict setup helpers
 ```
 
-**🔄 7.3 Schema & Subscription Features (Week 13)** - **PENDING**
-```swift
-// Schema and subscription modules
-Features/Schema/
-├── Domain/
-│   ├── SchemaManager.swift: Automatic table creation
-│   └── ModelRegistry.swift: Syncable model registration
-└── Data/
-    └── SchemaRepository.swift: Database schema operations
-
-Features/Subscription/
-├── Domain/
-│   └── SubscriptionManager.swift: Feature validation
-└── Presentation/
-    └── SubscriptionStatusViewModel.swift: Pro status UI
-```
-
-**Key Integration Features**:
-- [x] **End-to-End Workflows**: Complete user journeys from auth to sync
-- [x] **Feature Coordination**: Seamless interaction between all modules
-- [x] **Error Recovery**: Comprehensive error handling across all features
-- [x] **Performance**: Optimized data flow and minimal resource usage
-- [x] **Testing**: Integration tests for complete workflows
+**Key Features to Implement**:
+- [ ] **Public Protocols**: Clean contracts for extensibility
+- [ ] **Extension Methods**: Convenience methods on SwiftData models
+- [ ] **Builder APIs**: Fluent interfaces for configuration
+- [ ] **Type Safety**: Strong typing for all public APIs
+- [ ] **Documentation**: Comprehensive DocC documentation
 
 **Success Criteria**:
-- Complete authentication flows with session management
-- Automatic bidirectional sync with conflict resolution
-- Dynamic schema creation from SwiftData models
-- Pro feature validation with subscription integration
-- Comprehensive integration testing coverage
+- One-line SDK setup with sensible defaults
+- Clean access to all functionality through unified API
+- Proper encapsulation of internal implementation details
+- Excellent developer experience with IntelliSense support
+- Comprehensive documentation and code examples
 
 ---
 
@@ -477,96 +481,3 @@ Complete API documentation with DocC, comprehensive usage guides, real-world cod
 **Timeline**: Week 17-18
 
 Final production preparation including performance optimization, security audit, accessibility compliance, CI/CD pipeline setup, release versioning strategy, comprehensive changelog, community guidelines, and App Store review preparation.
-
----
-
-## 🗓️ Timeline Summary
-
-| Phase | Duration | Focus Area |
-|-------|----------|------------|
-| **Phase 1** | Weeks 1-5 | Foundation & Architecture |
-| **Phase 2** | Weeks 6-13 | Core Features |
-| **Phase 3** | Weeks 14-18 | Integration & Polish |
-
-**Total Timeline**: ~4.5 months for v1.0 release
-
-## 🎯 Success Metrics
-
-- **Developer Experience**: One-line setup with sensible defaults
-- **Performance**: Sub-100ms local operations, efficient sync batching
-- **Reliability**: 99.9% sync success rate with proper error recovery
-- **Test Coverage**: 90%+ code coverage across all modules
-- **Documentation**: Complete API docs with practical examples
-- **Community**: Active issue resolution and feature discussions
-
-## 🔄 Current Status
-
-**✅ Phase 1 COMPLETED** - Foundation & Architecture:
-- **Step 1** - Project Structure & Architecture Setup ✅
-- **Step 2** - Core Domain Layer Implementation ✅
-  - Step 2.1 - Domain Entities (User, SyncStatus, SyncPolicy, SharedTypes + extracted types)
-  - Step 2.2 - Domain Protocols (Syncable, SubscriptionValidating, ConflictResolvable, SyncRepositoryProtocol)
-  - Step 2.3 - Use Cases (AuthenticateUserUseCase, StartSyncUseCase, ValidateSubscriptionUseCase, ResolveSyncConflictUseCase)
-- **Step 3** - Infrastructure & Data Sources Setup ✅
-  - Step 3.1 - Network Infrastructure (NetworkError, RequestBuilder, SupabaseClient, NetworkMonitor, NetworkConfiguration)
-  - Step 3.2 - Storage Infrastructure (KeychainService, LocalDataSource with SyncChangeTracker)
-  - Step 3.3 - Remote Data Sources (SupabaseAuthDataSource, SupabaseDataDataSource, SupabaseRealtimeDataSource)
-  - Step 3.4 - Code Quality & Documentation (Refactoring, README updates, type organization)
-
-**🎯 Current Focus**: **Phase 2 - Step 4** - Repository Layer & Dependency Injection
-
-**✅ Recently Completed** (MAJOR MILESTONE):
-- **Step 4.1 Repository Implementations** - **FULLY COMPLETED** ✨
-  - AuthRepository: Complete authentication bridge
-  - SyncRepository: **Phase 2 + Phase 3 functionality complete** with service refactoring  
-  - ConflictRepository: Full conflict management implementation
-  - SubscriptionValidator: **Critical blocker resolved** - enables all subscription features
-  - LoggingService: Production-ready logging system
-  - **5 Supporting Services**: Extracted for clean separation of concerns
-
-**⏳ Next Priority Tasks**:
-1. **Complete Step 4.2** - Dependency Injection Container (PENDING)
-2. **Begin Step 5** - Public API & SDK Integration 
-3. **Testing** - Comprehensive test coverage for all repositories
-4. **Integration** - End-to-end workflow validation
-
-## 📊 Phase 1 Accomplishments Summary
-
-**Architecture Foundation** ✅
-- Clean Architecture with clear layer separation
-- SOLID principles implementation
-- Domain-driven design with rich business logic
-- Protocol-oriented programming for testability
-
-**Technical Infrastructure** ✅  
-- Production-ready network layer with retry logic
-- Secure local storage with Keychain integration
-- SwiftData integration with sync metadata
-- Real-time WebSocket communication
-- Thread-safe concurrent operations with actors
-
-**Code Quality** ✅
-- Systematic refactoring reducing file sizes by 26-71%
-- Extracted 15+ supporting type files for better organization
-- Comprehensive documentation with 25+ README files
-- Clean compilation with zero build errors
-
-**Development Velocity** ✅
-- Completed 8 weeks of planned work in Phase 1
-- Exceeded scope with additional refactoring and documentation
-- Established solid foundation for rapid Phase 2 development
-- Clear separation of concerns enabling parallel development
-
-## 🤝 Contributing
-
-We welcome contributions at any stage! Check our current focus area and see where you can help:
-
-- **Domain Logic**: Help implement business rules and use cases
-- **Infrastructure**: Contribute to network and storage implementations  
-- **Testing**: Add test cases and improve coverage
-- **Documentation**: Improve guides and examples
-- **Performance**: Optimize sync algorithms and data flow
-
----
-
-*Last Updated: [Current Date] | Version: 1.0.0-alpha*
