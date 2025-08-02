@@ -37,6 +37,10 @@ dependencies: [
 ]
 ```
 
+## Environment Setup
+
+For secure credential management, see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for detailed instructions on configuring your Supabase credentials using environment variables.
+
 ## Quick Start
 
 ### 1. Configure Supabase
