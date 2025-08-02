@@ -1,0 +1,121 @@
+name: "Copilot Setup Steps"
+
+# Automatically run the setup steps when they are changed to allow for easy validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+
+    # Set appropriate permissions
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Enable LFS if you use large files
+          lfs: false
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "5.9"
+          
+      - name: Setup Xcode (for iOS builds)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "15.2"
+          
+      - name: Cache Swift Package Manager dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+            ~/.swiftpm
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+            
+      - name: Resolve Swift Package dependencies
+        run: |
+          echo "Resolving Swift Package Manager dependencies..."
+          swift package resolve
+          
+      - name: Build Swift Package
+        run: |
+          echo "Building Swift Package..."
+          swift build
+          
+      - name: Run Swift Package Tests
+        run: |
+          echo "Running Swift Package tests..."
+          swift test || true
+          
+      - name: Install iOS Simulator runtime
+        run: |
+          echo "Installing iOS Simulator runtime..."
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcrun simctl list runtimes
+          
+      - name: Create iOS Simulator
+        run: |
+          echo "Creating iOS Simulator for testing..."
+          xcrun simctl create "iPhone 16" "iPhone 16" "iOS17.2" || true
+          xcrun simctl boot "iPhone 16" || true
+          
+      - name: Build iOS App (Xcode)
+        run: |
+          echo "Building iOS app with Xcode..."
+          xcodebuild -scheme SupabaseSwift \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Debug \
+            build || true
+            
+      - name: Prepare test environment
+        run: |
+          echo "Setting up test environment..."
+          # Create any necessary test configurations or mock data
+          mkdir -p TestResults
+          
+      - name: Install additional tools
+        run: |
+          echo "Installing helpful development tools..."
+          # Install SwiftLint for code linting
+          brew install swiftlint || true
+          
+          # Install xcbeautify for better Xcode output formatting
+          brew install xcbeautify || true
+          
+          # Install swift-format for code formatting
+          brew install swift-format || true
+          
+      - name: Setup environment variables
+        run: |
+          echo "Setting up environment variables..."
+          echo "SWIFT_VERSION=5.9" >> $GITHUB_ENV
+          echo "XCODE_VERSION=15.2" >> $GITHUB_ENV
+          echo "IOS_SIMULATOR=iPhone 16" >> $GITHUB_ENV
+          echo "PROJECT_ROOT=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+          
+      - name: Verify setup
+        run: |
+          echo "Verifying development environment setup..."
+          echo "Swift version: $(swift --version)"
+          echo "Xcode version: $(xcodebuild -version)"
+          echo "Available simulators:"
+          xcrun simctl list devices
+          echo "Project structure:"
+          ls -la
+          echo "Swift Package dependencies resolved:"
+          ls -la .build || true
