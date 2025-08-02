@@ -340,6 +340,8 @@ public final class ConflictRepository {
             return .normal
         case .versionConflict:
             return .low
+        case .unknown:
+            return .low
         }
     }
     

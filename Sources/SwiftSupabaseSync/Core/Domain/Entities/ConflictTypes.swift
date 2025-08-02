@@ -120,7 +120,10 @@ public struct SyncConflict: Codable, Equatable, Identifiable {
 }
 
 /// Represents the resolution of a synchronization conflict
-public struct ConflictResolution: Codable, Equatable {
+public struct ConflictResolution: Codable, Equatable, Identifiable {
+    /// Unique identifier for this resolution
+    public let id = UUID()
+    
     /// Strategy used to resolve the conflict
     public let strategy: ConflictResolutionStrategy
     
@@ -142,6 +145,9 @@ public struct ConflictResolution: Codable, Equatable {
     /// Confidence level of the resolution (0.0 to 1.0)
     public let confidence: Double
     
+    /// Whether the resolution was successful
+    public let wasSuccessful: Bool
+    
     public init(
         strategy: ConflictResolutionStrategy,
         resolvedData: [String: Any]? = nil,
@@ -149,7 +155,8 @@ public struct ConflictResolution: Codable, Equatable {
         explanation: String,
         wasAutomatic: Bool = true,
         resolvedAt: Date = Date(),
-        confidence: Double = 1.0
+        confidence: Double = 1.0,
+        wasSuccessful: Bool = true
     ) {
         self.strategy = strategy
         self.resolvedData = resolvedData
@@ -158,6 +165,7 @@ public struct ConflictResolution: Codable, Equatable {
         self.wasAutomatic = wasAutomatic
         self.resolvedAt = resolvedAt
         self.confidence = max(0.0, min(1.0, confidence))
+        self.wasSuccessful = wasSuccessful
     }
     
     // MARK: - Codable Implementation
@@ -170,6 +178,7 @@ public struct ConflictResolution: Codable, Equatable {
         case wasAutomatic = "was_automatic"
         case resolvedAt = "resolved_at"
         case confidence
+        case wasSuccessful = "was_successful"
     }
     
     public init(from decoder: Decoder) throws {
@@ -180,6 +189,7 @@ public struct ConflictResolution: Codable, Equatable {
         wasAutomatic = try container.decode(Bool.self, forKey: .wasAutomatic)
         resolvedAt = try container.decode(Date.self, forKey: .resolvedAt)
         confidence = try container.decode(Double.self, forKey: .confidence)
+        wasSuccessful = try container.decodeIfPresent(Bool.self, forKey: .wasSuccessful) ?? true
         
         // Decode resolved data safely
         if let resolvedDataEncoded = try container.decodeIfPresent(Data.self, forKey: .resolvedData) {
@@ -197,6 +207,7 @@ public struct ConflictResolution: Codable, Equatable {
         try container.encode(wasAutomatic, forKey: .wasAutomatic)
         try container.encode(resolvedAt, forKey: .resolvedAt)
         try container.encode(confidence, forKey: .confidence)
+        try container.encode(wasSuccessful, forKey: .wasSuccessful)
         
         // Encode resolved data safely
         if let resolvedData = resolvedData {
@@ -259,6 +270,7 @@ public enum ConflictType: String, CaseIterable, Codable {
     case versionConflict = "version_conflict"
     case schemaConflict = "schema_conflict"
     case permissionConflict = "permission_conflict"
+    case unknown = "unknown"
     
     public var displayName: String {
         switch self {
@@ -272,6 +284,8 @@ public enum ConflictType: String, CaseIterable, Codable {
             return "Schema Conflict"
         case .permissionConflict:
             return "Permission Conflict"
+        case .unknown:
+            return "Unknown Conflict"
         }
     }
 }
