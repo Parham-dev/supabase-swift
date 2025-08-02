@@ -149,6 +149,10 @@ public final class DependencyInjectionSetup {
             let config = try container.resolve(NetworkConfiguration.self)
             return RequestBuilder(baseURL: config.supabaseURL)
         }
+        
+        // Note: CoordinationHub and ModelRegistryService use shared instances
+        // Core managers will be created directly by the SDK to avoid Main Actor isolation issues in DI
+        // These services are accessed via their shared instances where needed
     }
     
     // MARK: - Utility Methods

@@ -332,15 +332,28 @@ public final class RepositoryFactory {
         logger?.info("RepositoryFactory: All use cases registered successfully")
     }
     
+    // MARK: - Testing Support
+    
+    /// Global testing data source for dependency injection in tests
+    public static var testingLocalDataSource: LocalDataSource?
+    
     /// Create all data sources and register them in the container
     /// - Throws: DIError if any data source cannot be created
     public func registerAllDataSources() throws {
         logger?.debug("RepositoryFactory: Registering all data sources")
         
-        // NOTE: LocalDataSource requires ModelContext from the app and should be registered separately
-        // container.register(LocalDataSource.self, lifetime: .singleton) { _ in
-        //     try self.createLocalDataSource()
-        // }
+        // Check if we have a test LocalDataSource available (for testing)
+        if let testLocalDataSource = RepositoryFactory.testingLocalDataSource {
+            container.register(LocalDataSource.self, lifetime: .singleton) { _ in
+                return testLocalDataSource
+            }
+            logger?.debug("RepositoryFactory: Registered test LocalDataSource")
+        } else {
+            // NOTE: LocalDataSource requires ModelContext from the app and should be registered separately
+            // container.register(LocalDataSource.self, lifetime: .singleton) { _ in
+            //     try self.createLocalDataSource()
+            // }
+        }
         
         container.register(SupabaseAuthDataSource.self, lifetime: .singleton) { _ in
             try self.createSupabaseAuthDataSource()

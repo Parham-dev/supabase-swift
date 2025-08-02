@@ -134,3 +134,8 @@ Temporary Items
 
 # Generated files
 *.generated.swift
+
+# Environment variables
+.env
+.env.local
+.env.*.local

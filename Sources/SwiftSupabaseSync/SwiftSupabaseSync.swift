@@ -328,17 +328,50 @@ private extension SwiftSupabaseSync {
     }
     
     func initializeCoreManagers() async throws {
-        // Resolve managers from DI container
-        self.coordinationHub = try ServiceLocator.shared.resolve(CoordinationHub.self)
-        self.authManager = try ServiceLocator.shared.resolve(AuthManager.self)
-        self.syncManager = try ServiceLocator.shared.resolve(SyncManager.self)
-        self.schemaManager = try ServiceLocator.shared.resolve(SchemaManager.self)
+        // Use shared coordination hub
+        self.coordinationHub = CoordinationHub.shared
+        
+        // Create managers directly with their dependencies resolved from DI
+        let authRepository = try ServiceLocator.shared.resolve(AuthRepositoryProtocol.self)
+        let authUseCase = try ServiceLocator.shared.resolve(AuthenticateUserUseCaseProtocol.self)
+        let subscriptionValidator = try ServiceLocator.shared.resolve(SubscriptionValidating.self)
+        let logger = ServiceLocator.shared.resolveOptional(SyncLoggerProtocol.self)
+        
+        let syncRepository = try ServiceLocator.shared.resolve(SyncRepositoryProtocol.self)
+        let startSyncUseCase = try ServiceLocator.shared.resolve(StartSyncUseCaseProtocol.self)
+        
+        // Create AuthManager
+        self.authManager = AuthManager(
+            authRepository: authRepository,
+            authUseCase: authUseCase,
+            subscriptionValidator: subscriptionValidator,
+            logger: logger
+        )
+        
+        // Create SyncManager
+        guard let authManager = self.authManager else {
+            throw SDKError.dependencyResolutionFailed("AuthManager not available")
+        }
+        
+        self.syncManager = SyncManager(
+            syncRepository: syncRepository,
+            startSyncUseCase: startSyncUseCase,
+            authManager: authManager,
+            logger: logger
+        )
+        
+        // Create SchemaManager
+        self.schemaManager = SchemaManager(
+            syncRepository: syncRepository,
+            authManager: authManager,
+            logger: logger
+        )
         
         // Validate all managers are available
-        guard authManager != nil,
-              syncManager != nil,
-              schemaManager != nil else {
-            throw SDKError.dependencyResolutionFailed("Failed to resolve core managers")
+        guard self.authManager != nil,
+              self.syncManager != nil,
+              self.schemaManager != nil else {
+            throw SDKError.dependencyResolutionFailed("Failed to create core managers")
         }
         
         // Initialize managers
