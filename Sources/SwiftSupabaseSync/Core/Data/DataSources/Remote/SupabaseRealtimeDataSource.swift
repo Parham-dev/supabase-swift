@@ -239,16 +239,17 @@ public final class SupabaseRealtimeDataSource: ObservableObject {
         webSocketTask?.receive { [weak self] result in
             switch result {
             case .success(let message):
-                Task { @MainActor in
+                Task { @MainActor [weak self] in
                     self?.handleWebSocketMessage(message)
                 }
                 self?.receiveMessage() // Continue listening
                 
             case .failure(let error):
-                Task { @MainActor in
-                    self?.connectionStatus = .error(error.localizedDescription)
-                    self?.connectionEventSubject.send(.error(error.localizedDescription))
-                    self?.errorEventSubject.send(.connectionError(error.localizedDescription))
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    self.connectionStatus = .error(error.localizedDescription)
+                    self.connectionEventSubject.send(.error(error.localizedDescription))
+                    self.errorEventSubject.send(.connectionError(error.localizedDescription))
                 }
             }
         }
