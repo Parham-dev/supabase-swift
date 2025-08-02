@@ -65,7 +65,6 @@ public final class SubscriptionManager: ObservableObject {
         subscriptionValidator: SubscriptionValidating,
         validateSubscriptionUseCase: ValidateSubscriptionUseCaseProtocol,
         authManager: AuthManager,
-        coordinationHub: CoordinationHub = CoordinationHub.shared,
         logger: SyncLoggerProtocol? = nil,
         enableCaching: Bool = true,
         cacheExpirationInterval: TimeInterval = 300, // 5 minutes
@@ -74,7 +73,7 @@ public final class SubscriptionManager: ObservableObject {
         self.subscriptionValidator = subscriptionValidator
         self.validateSubscriptionUseCase = validateSubscriptionUseCase
         self.authManager = authManager
-        self.coordinationHub = coordinationHub
+        self.coordinationHub = CoordinationHub.shared
         self.logger = logger
         self.enableCaching = enableCaching
         self.cacheExpirationInterval = cacheExpirationInterval

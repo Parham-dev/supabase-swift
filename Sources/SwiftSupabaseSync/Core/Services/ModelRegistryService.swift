@@ -12,26 +12,26 @@ import SwiftData
 /// Centralized service for managing Syncable model registration across all managers
 /// Provides single source of truth for model types, schema information, and lifecycle management
 @MainActor
-public final class ModelRegistryService: ObservableObject {
+internal final class ModelRegistryService: ObservableObject {
     
     // MARK: - Singleton
     
     /// Shared model registry service instance
-    public static let shared = ModelRegistryService()
+    internal static let shared = ModelRegistryService()
     
     // MARK: - Published Properties
     
     /// All registered models with their metadata
-    @Published public private(set) var registeredModels: [String: ModelRegistration] = [:]
+    @Published internal private(set) var registeredModels: [String: ModelRegistration] = [:]
     
     /// Count of registered models
-    @Published public private(set) var modelCount: Int = 0
+    @Published internal private(set) var modelCount: Int = 0
     
     /// Last registration error
-    @Published public private(set) var lastError: ModelRegistryError?
+    @Published internal private(set) var lastError: ModelRegistryError?
     
     /// Whether model discovery is in progress
-    @Published public private(set) var isDiscovering: Bool = false
+    @Published internal private(set) var isDiscovering: Bool = false
     
     // MARK: - Private Properties
     
@@ -53,7 +53,7 @@ public final class ModelRegistryService: ObservableObject {
     /// - Parameter modelType: The model type to register
     /// - Returns: Registration result with metadata
     @discardableResult
-    public func registerModel<T: Syncable>(_ modelType: T.Type) throws -> ModelRegistration {
+    internal func registerModel<T: Syncable>(_ modelType: T.Type) throws -> ModelRegistration {
         lock.lock()
         defer { lock.unlock() }
         
@@ -93,7 +93,7 @@ public final class ModelRegistryService: ObservableObject {
     /// - Parameter modelType: The model type to unregister
     /// - Returns: True if model was unregistered, false if not found
     @discardableResult
-    public func unregisterModel<T: Syncable>(_ modelType: T.Type) -> Bool {
+    internal func unregisterModel<T: Syncable>(_ modelType: T.Type) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         
@@ -129,7 +129,7 @@ public final class ModelRegistryService: ObservableObject {
     /// Bulk register multiple model types
     /// - Parameter modelTypes: Array of model types to register
     /// - Returns: Dictionary of registration results
-    public func registerModels(_ modelTypes: [any Syncable.Type]) -> [String: Result<ModelRegistration, ModelRegistryError>] {
+    internal func registerModels(_ modelTypes: [any Syncable.Type]) -> [String: Result<ModelRegistration, ModelRegistryError>] {
         var results: [String: Result<ModelRegistration, ModelRegistryError>] = [:]
         
         for modelType in modelTypes {
@@ -152,7 +152,7 @@ public final class ModelRegistryService: ObservableObject {
     /// Discover and register all Syncable models from a SwiftData container
     /// - Parameter container: SwiftData model container to scan
     /// - Returns: Number of models discovered and registered
-    public func discoverModels(from container: ModelContainer) async -> Int {
+    internal func discoverModels(from container: ModelContainer) async -> Int {
         await setDiscovering(true)
         defer { Task { await setDiscovering(false) } }
         
@@ -206,7 +206,7 @@ public final class ModelRegistryService: ObservableObject {
     /// Get registration for a specific model type
     /// - Parameter modelType: Model type to query
     /// - Returns: Registration if found
-    public func getRegistration<T: Syncable>(for modelType: T.Type) -> ModelRegistration? {
+    internal func getRegistration<T: Syncable>(for modelType: T.Type) -> ModelRegistration? {
         lock.lock()
         defer { lock.unlock() }
         
@@ -216,7 +216,7 @@ public final class ModelRegistryService: ObservableObject {
     /// Get registration by table name
     /// - Parameter tableName: Table name to query
     /// - Returns: Registration if found
-    public func getRegistration(for tableName: String) -> ModelRegistration? {
+    internal func getRegistration(for tableName: String) -> ModelRegistration? {
         lock.lock()
         defer { lock.unlock() }
         
@@ -226,7 +226,7 @@ public final class ModelRegistryService: ObservableObject {
     /// Check if a model type is registered
     /// - Parameter modelType: Model type to check
     /// - Returns: True if registered
-    public func isRegistered<T: Syncable>(_ modelType: T.Type) -> Bool {
+    internal func isRegistered<T: Syncable>(_ modelType: T.Type) -> Bool {
         return getRegistration(for: modelType) != nil
     }
     
@@ -251,7 +251,7 @@ public final class ModelRegistryService: ObservableObject {
     /// Get registrations filtered by registration source
     /// - Parameter source: Registration source to filter by
     /// - Returns: Filtered registrations
-    public func getRegistrations(registeredBy source: RegistrationSource) -> [ModelRegistration] {
+    internal func getRegistrations(registeredBy source: RegistrationSource) -> [ModelRegistration] {
         lock.lock()
         defer { lock.unlock() }
         
@@ -262,7 +262,7 @@ public final class ModelRegistryService: ObservableObject {
     
     /// Validate that all registered models have compatible schemas
     /// - Returns: Validation results for each model
-    public func validateAllModels() -> [String: ValidationResult] {
+    internal func validateAllModels() -> [String: ValidationResult] {
         lock.lock()
         defer { lock.unlock() }
         
@@ -277,7 +277,7 @@ public final class ModelRegistryService: ObservableObject {
     
     /// Validate dependencies between registered models
     /// - Returns: Dependency validation results
-    public func validateModelDependencies() -> DependencyValidationResult {
+    internal func validateModelDependencies() -> DependencyValidationResult {
         lock.lock()
         defer { lock.unlock() }
         
@@ -309,7 +309,7 @@ public final class ModelRegistryService: ObservableObject {
     /// - Parameters:
     ///   - tableName: Table name to observe (nil for all models)
     ///   - observer: Observer to add
-    public func addObserver(for tableName: String?, observer: ModelRegistryObserver) {
+    internal func addObserver(for tableName: String?, observer: ModelRegistryObserver) {
         let targetTableName = tableName ?? "*"
         
         if modelObservers[targetTableName] == nil {
@@ -323,7 +323,7 @@ public final class ModelRegistryService: ObservableObject {
     /// - Parameters:
     ///   - tableName: Table name being observed
     ///   - observer: Observer to remove
-    public func removeObserver(for tableName: String?, observer: ModelRegistryObserver) {
+    internal func removeObserver(for tableName: String?, observer: ModelRegistryObserver) {
         let targetTableName = tableName ?? "*"
         
         if var observers = modelObservers[targetTableName] {
@@ -485,7 +485,7 @@ public final class ModelRegistryService: ObservableObject {
     // MARK: - Cleanup
     
     /// Clear all registered models
-    public func clear() {
+    internal func clear() {
         lock.lock()
         defer { lock.unlock() }
         
@@ -496,7 +496,7 @@ public final class ModelRegistryService: ObservableObject {
     }
     
     /// Clear errors
-    public func clearErrors() {
+    internal func clearErrors() {
         Task {
             await MainActor.run {
                 self.lastError = nil

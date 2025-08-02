@@ -58,7 +58,6 @@ public final class AuthManager: ObservableObject {
         authRepository: AuthRepositoryProtocol,
         authUseCase: AuthenticateUserUseCaseProtocol,
         subscriptionValidator: SubscriptionValidating,
-        coordinationHub: CoordinationHub = CoordinationHub.shared,
         logger: SyncLoggerProtocol? = nil,
         enableAutoTokenRefresh: Bool = true,
         tokenRefreshThreshold: TimeInterval = 300 // 5 minutes
@@ -66,7 +65,7 @@ public final class AuthManager: ObservableObject {
         self.authRepository = authRepository
         self.authUseCase = authUseCase
         self.subscriptionValidator = subscriptionValidator
-        self.coordinationHub = coordinationHub
+        self.coordinationHub = CoordinationHub.shared
         self.logger = logger
         self.enableAutoTokenRefresh = enableAutoTokenRefresh
         self.tokenRefreshThreshold = tokenRefreshThreshold

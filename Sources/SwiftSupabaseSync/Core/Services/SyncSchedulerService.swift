@@ -11,32 +11,32 @@ import Combine
 /// Intelligent sync scheduling service that manages when and how sync operations should be triggered
 /// Considers network conditions, battery state, sync policies, and user activity patterns
 @MainActor
-public final class SyncSchedulerService: ObservableObject {
+internal final class SyncSchedulerService: ObservableObject {
     
     // MARK: - Singleton
     
     /// Shared sync scheduler service instance
-    public static let shared = SyncSchedulerService()
+    internal static let shared = SyncSchedulerService()
     
     // MARK: - Published Properties
     
     /// Current scheduling state
-    @Published public private(set) var schedulingState: SchedulingState = .idle
+    @Published internal private(set) var schedulingState: SchedulingState = .idle
     
     /// Active sync schedules by ID
-    @Published public private(set) var activeSchedules: [String: SyncSchedule] = [:]
+    @Published internal private(set) var activeSchedules: [String: SyncSchedule] = [:]
     
     /// Next scheduled sync operations
-    @Published public private(set) var upcomingSchedules: [ScheduledSyncOperation] = []
+    @Published internal private(set) var upcomingSchedules: [ScheduledSyncOperation] = []
     
     /// Current active sync policy being used
-    @Published public private(set) var activeSyncPolicy: SyncPolicy = .balanced
+    @Published internal private(set) var activeSyncPolicy: SyncPolicy = .balanced
     
     /// Whether automatic scheduling is enabled
-    @Published public private(set) var isAutoSchedulingEnabled: Bool = true
+    @Published internal private(set) var isAutoSchedulingEnabled: Bool = true
     
     /// Last scheduling error
-    @Published public private(set) var lastError: SchedulingError?
+    @Published internal private(set) var lastError: SchedulingError?
     
     // MARK: - Private Properties
     
@@ -81,7 +81,7 @@ public final class SyncSchedulerService: ObservableObject {
     
     /// Add a new sync schedule
     /// - Parameter schedule: Schedule to add
-    public func addSchedule(_ schedule: SyncSchedule) {
+    internal func addSchedule(_ schedule: SyncSchedule) {
         logger?.info("SyncScheduler: Adding schedule '\(schedule.name)' (\(schedule.id))")
         
         activeSchedules[schedule.id] = schedule
@@ -108,7 +108,7 @@ public final class SyncSchedulerService: ObservableObject {
     
     /// Remove a sync schedule
     /// - Parameter scheduleId: ID of schedule to remove
-    public func removeSchedule(_ scheduleId: String) {
+    internal func removeSchedule(_ scheduleId: String) {
         logger?.debug("SyncScheduler: Removing schedule \(scheduleId)")
         
         // Cancel any running task for this schedule
@@ -132,7 +132,7 @@ public final class SyncSchedulerService: ObservableObject {
     /// - Parameters:
     ///   - scheduleId: ID of schedule to update
     ///   - schedule: Updated schedule configuration
-    public func updateSchedule(_ scheduleId: String, with schedule: SyncSchedule) {
+    internal func updateSchedule(_ scheduleId: String, with schedule: SyncSchedule) {
         guard activeSchedules[scheduleId] != nil else {
             logger?.warning("SyncScheduler: Attempt to update non-existent schedule \(scheduleId)")
             return
@@ -151,14 +151,14 @@ public final class SyncSchedulerService: ObservableObject {
     
     /// Get all active schedules
     /// - Returns: Array of active sync schedules
-    public func getAllSchedules() -> [SyncSchedule] {
+    internal func getAllSchedules() -> [SyncSchedule] {
         return Array(activeSchedules.values)
     }
     
     /// Get schedule by ID
     /// - Parameter scheduleId: Schedule ID to look up
     /// - Returns: Schedule if found
-    public func getSchedule(_ scheduleId: String) -> SyncSchedule? {
+    internal func getSchedule(_ scheduleId: String) -> SyncSchedule? {
         return activeSchedules[scheduleId]
     }
     
@@ -166,7 +166,7 @@ public final class SyncSchedulerService: ObservableObject {
     
     /// Update the active sync policy
     /// - Parameter policy: New sync policy to use
-    public func updateSyncPolicy(_ policy: SyncPolicy) {
+    internal func updateSyncPolicy(_ policy: SyncPolicy) {
         activeSyncPolicy = policy
         
         logger?.info("SyncScheduler: Updated sync policy to '\(policy.name)'")
@@ -186,7 +186,7 @@ public final class SyncSchedulerService: ObservableObject {
     
     /// Enable or disable automatic scheduling
     /// - Parameter enabled: Whether automatic scheduling should be enabled
-    public func setAutoSchedulingEnabled(_ enabled: Bool) {
+    internal func setAutoSchedulingEnabled(_ enabled: Bool) {
         isAutoSchedulingEnabled = enabled
         
         logger?.info("SyncScheduler: Auto-scheduling \(enabled ? "enabled" : "disabled")")
@@ -207,7 +207,7 @@ public final class SyncSchedulerService: ObservableObject {
     ///   - user: User to sync for
     ///   - priority: Priority of the sync operation
     /// - Returns: Sync operation result
-    public func triggerImmediateSync(for user: User, priority: SyncPriority = .normal) async -> SyncOperationResult {
+    internal func triggerImmediateSync(for user: User, priority: SyncPriority = .normal) async -> SyncOperationResult {
         logger?.info("SyncScheduler: Triggering immediate sync for user \(user.id)")
         
         do {
@@ -245,7 +245,7 @@ public final class SyncSchedulerService: ObservableObject {
     ///   - user: User to sync for
     ///   - priority: Priority of the sync operation
     /// - Returns: Sync operation result
-    public func triggerModelSync<T: Syncable>(
+    internal func triggerModelSync<T: Syncable>(
         for modelType: T.Type,
         user: User,
         priority: SyncPriority = .normal
@@ -281,7 +281,7 @@ public final class SyncSchedulerService: ObservableObject {
     ///   - user: User to evaluate sync for
     ///   - entityType: Optional specific entity type to check
     /// - Returns: Scheduling recommendation
-    public func evaluateSyncScheduling(for user: User, entityType: String? = nil) async -> SchedulingRecommendation {
+    internal func evaluateSyncScheduling(for user: User, entityType: String? = nil) async -> SchedulingRecommendation {
         // Check basic eligibility
         do {
             let eligibility = try await startSyncUseCase.checkSyncEligibility(for: user, using: activeSyncPolicy)
@@ -697,7 +697,7 @@ public final class SyncSchedulerService: ObservableObject {
     // MARK: - Cleanup
     
     /// Clear all errors
-    public func clearErrors() {
+    internal func clearErrors() {
         Task {
             await MainActor.run {
                 self.lastError = nil
@@ -706,7 +706,7 @@ public final class SyncSchedulerService: ObservableObject {
     }
     
     /// Reset scheduler to initial state
-    public func reset() {
+    internal func reset() {
         stopSchedulingTimer()
         clearUpcomingSchedules()
         activeSchedules.removeAll()

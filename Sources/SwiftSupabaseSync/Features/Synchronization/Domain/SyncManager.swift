@@ -71,9 +71,6 @@ public final class SyncManager: ObservableObject {
         startSyncUseCase: StartSyncUseCaseProtocol,
         authManager: AuthManager,
         conflictResolver: ConflictResolvable? = nil,
-        coordinationHub: CoordinationHub = CoordinationHub.shared,
-        modelRegistry: ModelRegistryService = ModelRegistryService.shared,
-        syncScheduler: SyncSchedulerService = SyncSchedulerService.shared,
         logger: SyncLoggerProtocol? = nil,
         syncPolicy: SyncPolicy = .balanced,
         enableAutoSync: Bool = true,
@@ -84,9 +81,9 @@ public final class SyncManager: ObservableObject {
         self.startSyncUseCase = startSyncUseCase
         self.authManager = authManager
         self.conflictResolver = conflictResolver
-        self.coordinationHub = coordinationHub
-        self.modelRegistry = modelRegistry
-        self.syncScheduler = syncScheduler
+        self.coordinationHub = CoordinationHub.shared
+        self.modelRegistry = ModelRegistryService.shared
+        self.syncScheduler = SyncSchedulerService.shared
         self.logger = logger
         self.syncPolicy = syncPolicy
         self.enableAutoSync = enableAutoSync

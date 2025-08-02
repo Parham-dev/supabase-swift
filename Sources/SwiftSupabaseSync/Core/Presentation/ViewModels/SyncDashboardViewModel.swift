@@ -102,14 +102,13 @@ public final class SyncDashboardViewModel: ObservableObject {
         syncStatusPublisher: SyncStatusPublisher,
         authStatePublisher: AuthStatePublisher,
         networkStatusPublisher: NetworkStatusPublisher,
-        realtimeDataPublisher: RealtimeDataPublisher,
-        coordinationHub: CoordinationHub? = nil
+        realtimeDataPublisher: RealtimeDataPublisher
     ) {
         self.syncStatusPublisher = syncStatusPublisher
         self.authStatePublisher = authStatePublisher
         self.networkStatusPublisher = networkStatusPublisher
         self.realtimeDataPublisher = realtimeDataPublisher
-        self.coordinationHub = coordinationHub ?? CoordinationHub.shared
+        self.coordinationHub = CoordinationHub.shared
         
         setupBindings()
         setupAutoRefresh()

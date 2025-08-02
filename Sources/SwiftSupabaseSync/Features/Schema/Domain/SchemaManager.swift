@@ -53,8 +53,6 @@ public final class SchemaManager: ObservableObject {
     public init(
         syncRepository: SyncRepositoryProtocol,
         authManager: AuthManager,
-        coordinationHub: CoordinationHub = CoordinationHub.shared,
-        modelRegistryService: ModelRegistryService = ModelRegistryService.shared,
         logger: SyncLoggerProtocol? = nil,
         autoCreateTables: Bool = true,
         validateOnStartup: Bool = true,
@@ -62,8 +60,8 @@ public final class SchemaManager: ObservableObject {
     ) {
         self.syncRepository = syncRepository
         self.authManager = authManager
-        self.coordinationHub = coordinationHub
-        self.modelRegistryService = modelRegistryService
+        self.coordinationHub = CoordinationHub.shared
+        self.modelRegistryService = ModelRegistryService.shared
         self.logger = logger
         self.autoCreateTables = autoCreateTables
         self.validateOnStartup = validateOnStartup

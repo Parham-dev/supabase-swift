@@ -11,23 +11,23 @@ import Combine
 /// Central coordination hub for managing inter-manager communication and state coordination
 /// Provides event-driven coordination between AuthManager, SyncManager, SchemaManager, and SubscriptionManager
 @MainActor
-public final class CoordinationHub: ObservableObject {
+internal final class CoordinationHub: ObservableObject {
     
     // MARK: - Singleton
     
     /// Shared coordination hub instance
-    public static let shared = CoordinationHub()
+    internal static let shared = CoordinationHub()
     
     // MARK: - Published Properties
     
     /// Current coordination state
-    @Published public private(set) var coordinationState: CoordinationState = .idle
+    @Published internal private(set) var coordinationState: CoordinationState = .idle
     
     /// Active coordination events being processed
-    @Published public private(set) var activeEvents: [CoordinationEvent] = []
+    @Published internal private(set) var activeEvents: [CoordinationEvent] = []
     
     /// Last coordination error
-    @Published public private(set) var lastError: CoordinationError?
+    @Published internal private(set) var lastError: CoordinationError?
     
     // MARK: - Private Properties
     
@@ -87,7 +87,7 @@ public final class CoordinationHub: ObservableObject {
     
     /// Publish a coordination event
     /// - Parameter event: Event to publish
-    public func publish(_ event: CoordinationEvent) {
+    internal func publish(_ event: CoordinationEvent) {
         Task {
             await ensureEventHandlingSetup()
             
@@ -126,7 +126,7 @@ public final class CoordinationHub: ObservableObject {
     ///   - user: Current user (nil if signed out)
     ///   - isAuthenticated: Whether user is authenticated
     ///   - authStatus: Current authentication status
-    public func publishAuthStateChanged(
+    internal func publishAuthStateChanged(
         user: User?,
         isAuthenticated: Bool,
         authStatus: AuthenticationStatus
@@ -147,7 +147,7 @@ public final class CoordinationHub: ObservableObject {
     ///   - syncState: Current sync state
     ///   - isSyncing: Whether sync is active
     ///   - progress: Sync progress (0.0 to 1.0)
-    public func publishSyncStateChanged(
+    internal func publishSyncStateChanged(
         syncState: SyncState,
         isSyncing: Bool,
         progress: Double
@@ -168,7 +168,7 @@ public final class CoordinationHub: ObservableObject {
     ///   - isConnected: Whether network is connected
     ///   - connectionType: Type of network connection
     ///   - isExpensive: Whether connection is expensive
-    public func publishNetworkStateChanged(
+    internal func publishNetworkStateChanged(
         isConnected: Bool,
         connectionType: ConnectionType,
         isExpensive: Bool
@@ -189,7 +189,7 @@ public final class CoordinationHub: ObservableObject {
     ///   - tier: Current subscription tier
     ///   - isValid: Whether subscription is valid
     ///   - features: Available features
-    public func publishSubscriptionChanged(
+    internal func publishSubscriptionChanged(
         tier: SubscriptionTier,
         isValid: Bool,
         features: Set<Feature>
@@ -211,7 +211,7 @@ public final class CoordinationHub: ObservableObject {
     /// - Parameters:
     ///   - eventType: Type of event to handle
     ///   - handler: Handler function to execute
-    public func registerHandler(
+    internal func registerHandler(
         for eventType: CoordinationEventType,
         handler: @escaping (CoordinationEvent) async -> Void
     ) {
@@ -223,7 +223,7 @@ public final class CoordinationHub: ObservableObject {
     
     /// Remove all handlers for a specific event type
     /// - Parameter eventType: Event type to clear handlers for
-    public func clearHandlers(for eventType: CoordinationEventType) {
+    internal func clearHandlers(for eventType: CoordinationEventType) {
         eventHandlers[eventType] = []
     }
     
@@ -231,7 +231,7 @@ public final class CoordinationHub: ObservableObject {
     
     /// Coordinate authentication state change across all managers
     /// - Parameter user: New user state
-    public func coordinateAuthenticationChange(_ user: User?) async {
+    internal func coordinateAuthenticationChange(_ user: User?) async {
         let isAuthenticated = user != nil
         let authStatus = user?.authenticationStatus ?? .unauthenticated
         
@@ -256,7 +256,7 @@ public final class CoordinationHub: ObservableObject {
     /// - Parameters:
     ///   - isConnected: Whether network is connected
     ///   - connectionType: Type of connection
-    public func coordinateNetworkChange(isConnected: Bool, connectionType: ConnectionType) async {
+    internal func coordinateNetworkChange(isConnected: Bool, connectionType: ConnectionType) async {
         publishNetworkStateChanged(
             isConnected: isConnected,
             connectionType: connectionType,
@@ -282,7 +282,7 @@ public final class CoordinationHub: ObservableObject {
     
     /// Coordinate sync error across managers
     /// - Parameter error: Sync error that occurred
-    public func coordinateSyncError(_ error: SyncError) async {
+    internal func coordinateSyncError(_ error: SyncError) async {
         let event = CoordinationEvent(
             type: .syncErrorOccurred,
             data: [
@@ -378,7 +378,7 @@ public final class CoordinationHub: ObservableObject {
     // MARK: - State Management
     
     /// Clear all coordination errors
-    public func clearErrors() {
+    internal func clearErrors() {
         Task {
             await MainActor.run {
                 self.lastError = nil
@@ -390,7 +390,7 @@ public final class CoordinationHub: ObservableObject {
     }
     
     /// Reset coordination hub to initial state
-    public func reset() {
+    internal func reset() {
         Task {
             await MainActor.run {
                 self.activeEvents.removeAll()
