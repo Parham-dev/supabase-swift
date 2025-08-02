@@ -35,6 +35,15 @@ jobs:
           # Enable LFS if you use large files
           lfs: false
           
+      - name: Display working directory info
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Directory name: $(basename $(pwd))"
+          echo "Package.swift location:"
+          find . -name "Package.swift" -type f | head -5
+          echo "Package name from Package.swift:"
+          grep "name:" Package.swift | head -1
+          
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -51,20 +60,38 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-spm-
             
+      - name: Setup Swift environment
+        run: |
+          echo "Setting up Swift environment..."
+          # Set environment variables for Swift Package Manager
+          echo "SWIFTPM_PACKAGE_ROOT=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+          echo "Package root: $GITHUB_WORKSPACE"
+          
+      - name: Clean build artifacts
+        run: |
+          echo "Cleaning any existing build artifacts..."
+          rm -rf .build
+          rm -rf .swiftpm
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*-*
+          swift package clean || true
+          
       - name: Resolve Swift Package dependencies
         run: |
           echo "Resolving Swift Package Manager dependencies..."
+          cd $GITHUB_WORKSPACE
           swift package resolve
           
       - name: Build Swift Package
         run: |
           echo "Building Swift Package..."
-          swift build
+          cd $GITHUB_WORKSPACE
+          swift build -v
           
       - name: Run Swift Package Tests
         run: |
           echo "Running Swift Package tests..."
-          swift test --enable-code-coverage || echo "Tests failed but continuing setup"
+          cd $GITHUB_WORKSPACE
+          swift test -v --enable-code-coverage || echo "Tests failed but continuing setup"
           
       - name: Setup iOS Simulator
         run: |
