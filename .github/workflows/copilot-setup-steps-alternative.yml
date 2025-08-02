@@ -1,0 +1,117 @@
+name: "Copilot Setup Steps (Alternative)"
+
+# Alternative approach using xcodebuild for iOS-specific builds
+# This avoids potential cyclic dependency issues with swift build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps-alternative.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps-alternative.yml
+
+jobs:
+  copilot-setup-steps:
+    runs-on: macos-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Select Xcode version
+        run: |
+          echo "Available Xcode versions:"
+          ls /Applications | grep Xcode
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+          
+      - name: Cache Swift dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+            ~/.swiftpm
+          key: ${{ runner.os }}-spm-alt-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-alt-
+            
+      - name: Build using xcodebuild
+        run: |
+          echo "Building Swift Package using xcodebuild..."
+          # First, generate an Xcode project from Package.swift
+          swift package generate-xcodeproj || true
+          
+          # If xcodeproj exists, use it
+          if [ -f "SwiftSupabaseSync.xcodeproj/project.pbxproj" ]; then
+            echo "Building with generated xcodeproj..."
+            xcodebuild -project SwiftSupabaseSync.xcodeproj \
+              -scheme SwiftSupabaseSync \
+              -destination 'platform=macOS' \
+              build
+          else
+            echo "Falling back to swift build..."
+            swift build -v
+          fi
+          
+      - name: Run tests using xcodebuild
+        run: |
+          echo "Running tests..."
+          if [ -f "SwiftSupabaseSync.xcodeproj/project.pbxproj" ]; then
+            xcodebuild test \
+              -project SwiftSupabaseSync.xcodeproj \
+              -scheme SwiftSupabaseSync \
+              -destination 'platform=macOS'
+          else
+            swift test -v
+          fi
+          
+      - name: Setup iOS Simulator
+        run: |
+          echo "Setting up iOS Simulator..."
+          xcrun simctl list devices
+          
+      - name: Build iOS App
+        run: |
+          echo "Building iOS app with Xcode..."
+          if [ -f "SupabaseSwift.xcodeproj/project.pbxproj" ]; then
+            xcodebuild -project SupabaseSwift.xcodeproj \
+              -scheme SupabaseSwift \
+              -destination 'generic/platform=iOS' \
+              -configuration Debug \
+              build || echo "iOS app build failed but continuing"
+          fi
+          
+      - name: Install development tools
+        run: |
+          echo "Installing development tools..."
+          brew update || true
+          brew install swiftlint || true
+          brew install xcbeautify || true
+          brew install swift-format || true
+          
+      - name: Create helper documentation
+        run: |
+          echo "Creating helper documentation..."
+          cat > copilot-commands-alt.md << 'EOF'
+          # Alternative Copilot Commands
+          
+          ## When swift build fails with cyclic dependency:
+          1. Use xcodebuild: `xcodebuild -project SwiftSupabaseSync.xcodeproj -scheme SwiftSupabaseSync build`
+          2. Generate xcodeproj: `swift package generate-xcodeproj`
+          3. Clean: `rm -rf .build && swift package clean`
+          
+          ## Testing commands:
+          - Swift test: `swift test -v`
+          - Xcode test: `xcodebuild test -project SwiftSupabaseSync.xcodeproj -scheme SwiftSupabaseSync`
+          
+          ## iOS App commands:
+          - Build: `xcodebuild -project SupabaseSwift.xcodeproj -scheme SupabaseSwift build`
+          - Test: `xcodebuild test -project SupabaseSwift.xcodeproj -scheme SupabaseSwift -destination 'platform=iOS Simulator,name=iPhone 15 Pro'`
+          EOF
