@@ -1,23 +1,15 @@
 name: "Copilot Setup Steps"
 
 # This workflow sets up the development environment for GitHub Copilot coding agent
-# It configures Swift, Xcode, iOS Simulator, and installs helpful development tools
+# Focused on Swift Package development and testing for AI-assisted development
 # The agent will be able to:
 # - Build and test Swift packages
-# - Build and test iOS apps in Xcode
-# - Run unit tests and UI tests
 # - Use code quality tools (SwiftLint, swift-format)
 # - Access pre-installed dependencies for faster iterations
 
-# Automatically run the setup steps when they are changed to allow for easy validation
+# Manual trigger only - auto-run disabled for AI development environment
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - .github/workflows/copilot-setup-steps.yml
-  pull_request:
-    paths:
-      - .github/workflows/copilot-setup-steps.yml
 
 jobs:
   # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot
@@ -37,27 +29,24 @@ jobs:
           # Use a different path to avoid cyclic dependency issues
           path: swift-supabase-sync-project
           
-      - name: Display working directory info
+      - name: Verify setup
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Checkout directory: swift-supabase-sync-project"
+          echo "Swift Package development environment setup"
           cd swift-supabase-sync-project
-          echo "Package.swift location:"
-          find . -name "Package.swift" -type f | head -5
-          echo "Package name from Package.swift:"
-          grep "name:" Package.swift | head -1
+          echo "Package: $(grep "name:" Package.swift | head -1)"
+          echo "Swift version: $(swift --version | head -1)"
           
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "15.2"
+      # Xcode setup - commented out for Swift Package focus
+      # - name: Setup Xcode
+      #   uses: maxim-lobanov/setup-xcode@v1
+      #   with:
+      #     xcode-version: "15.2"
           
-      - name: Cache Swift Package Manager dependencies
+      - name: Cache Swift Package dependencies
         uses: actions/cache@v4
         with:
           path: |
             swift-supabase-sync-project/.build
-            ~/Library/Developer/Xcode/DerivedData
             ~/.swiftpm
           key: ${{ runner.os }}-spm-${{ hashFiles('swift-supabase-sync-project/Package.resolved') }}
           restore-keys: |
@@ -98,45 +87,36 @@ jobs:
           cd $WORKING_DIR
           swift test --enable-code-coverage || echo "Tests failed but continuing setup"
           
-      - name: Setup iOS Simulator
-        run: |
-          echo "Setting up iOS Simulator..."
-          # List available simulators and runtimes
-          xcrun simctl list devices
-          xcrun simctl list runtimes
+      # iOS Simulator setup - commented out for Swift Package focus
+      # - name: Setup iOS Simulator
+      #   run: |
+      #     echo "Setting up iOS Simulator..."
+      #     xcrun simctl list devices
+      #     SIMULATOR_NAME="iPhone 15 Pro"
+      #     xcrun simctl create "$SIMULATOR_NAME" "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro" "com.apple.CoreSimulator.SimRuntime.iOS-17-2" || true
+      #     xcrun simctl boot "$SIMULATOR_NAME" || true
           
-          # Create and boot a simulator
-          SIMULATOR_NAME="iPhone 15 Pro"
-          echo "Creating simulator: $SIMULATOR_NAME"
-          xcrun simctl create "$SIMULATOR_NAME" "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro" "com.apple.CoreSimulator.SimRuntime.iOS-17-2" || true
-          xcrun simctl boot "$SIMULATOR_NAME" || true
-          
-      - name: Build iOS App (Xcode)
-        run: |
-          echo "Building iOS app with Xcode..."
-          cd $WORKING_DIR
-          xcodebuild -scheme SupabaseSwift \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
-            -configuration Debug \
-            build || true
+      # iOS App build - commented out for Swift Package focus
+      # - name: Build iOS App (Xcode)
+      #   run: |
+      #     echo "Building iOS app with Xcode..."
+      #     cd $WORKING_DIR
+      #     xcodebuild -scheme SupabaseSwift \
+      #       -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+      #       -configuration Debug \
+      #       build || true
             
-      - name: Prepare test environment
-        run: |
-          echo "Setting up test environment..."
-          # Create any necessary test configurations or mock data
-          mkdir -p TestResults
+      # Test environment setup - simplified for Swift Package focus
+      # - name: Prepare test environment
+      #   run: |
+      #     echo "Setting up test environment..."
+      #     mkdir -p TestResults
           
-      - name: Install additional tools
+      - name: Install development tools
         run: |
-          echo "Installing helpful development tools..."
-          # Update Homebrew first
-          brew update || true
-          
+          echo "Installing Swift development tools..."
           # Install SwiftLint for code linting
           brew install swiftlint || true
-          
-          # Install xcbeautify for better Xcode output formatting
-          brew install xcbeautify || true
           
           # Install swift-format for code formatting
           brew install swift-format || true
@@ -145,60 +125,58 @@ jobs:
         run: |
           echo "Setting up environment variables..."
           echo "SWIFT_VERSION=$(swift --version | head -n 1)" >> $GITHUB_ENV
-          echo "XCODE_VERSION=15.2" >> $GITHUB_ENV
-          echo "IOS_SIMULATOR=iPhone 15 Pro" >> $GITHUB_ENV
           echo "PROJECT_ROOT=$WORKING_DIR" >> $GITHUB_ENV
           
-      - name: Verify setup
+      - name: Final verification
         run: |
-          echo "Verifying development environment setup..."
-          echo "Swift version: $(swift --version)"
-          echo "Xcode version: $(xcodebuild -version)"
-          echo "Available simulators:"
-          xcrun simctl list devices
+          echo "✅ Swift Package development environment ready!"
+          echo "Swift version: $(swift --version | head -1)"
           echo "Project structure:"
-          cd $WORKING_DIR && ls -la
-          echo "Swift Package dependencies resolved:"
-          cd $WORKING_DIR && ls -la .build || true
+          cd $WORKING_DIR && ls -la Sources/
+          echo "Dependencies resolved: $(ls $WORKING_DIR/.build 2>/dev/null && echo 'Yes' || echo 'No')"
           
       - name: Create helper commands file
         run: |
           echo "Creating helper commands for Copilot..."
           cd $WORKING_DIR
           cat > copilot-commands.md << 'EOF'
-          # Copilot Helper Commands for Swift/iOS Development
+          # Copilot Helper Commands - Swift Package Development
 
-          ## Build Commands
-          - Build Swift Package: `swift build`
-          - Build iOS App: `xcodebuild -scheme SupabaseSwift -destination 'platform=iOS Simulator,name=iPhone 15 Pro' build`
-          - Clean build: `swift package clean && xcodebuild clean`
+          ## 🚀 Quick Start
+          All commands should be run from the Swift Package directory.
 
-          ## Test Commands
-          - Run Swift Package tests: `swift test`
+          ## 📦 Build Commands
+          - Build package: `swift build`
+          - Clean build: `swift package clean`
+          - Build with debug info: `swift build -c debug`
+
+          ## 🧪 Test Commands
+          - Run all tests: `swift test`
           - Run specific test: `swift test --filter TestName`
-          - Run Xcode unit tests: `xcodebuild test -scheme SupabaseSwift -destination 'platform=iOS Simulator,name=iPhone 15 Pro'`
           - Run tests with coverage: `swift test --enable-code-coverage`
+          - Verbose test output: `swift test -v`
 
-          ## Code Quality
+          ## 🔧 Code Quality
           - Lint code: `swiftlint`
           - Format code: `swift-format -i Sources/**/*.swift Tests/**/*.swift`
           - Check format: `swift-format lint Sources/**/*.swift Tests/**/*.swift`
 
-          ## Dependency Management
+          ## 📋 Dependency Management
           - Update dependencies: `swift package update`
           - Resolve dependencies: `swift package resolve`
           - Show dependencies: `swift package show-dependencies`
+          - Reset package: `swift package reset`
 
-          ## Debugging
-          - Build with verbose output: `swift build -v`
-          - Test with verbose output: `swift test -v`
-          - Xcode build with pretty output: `xcodebuild -scheme SupabaseSwift build | xcbeautify`
+          ## 📁 Project Structure
+          - Main library: `Sources/SwiftSupabaseSync/`
+          - Package tests: `Tests/SwiftSupabaseSyncTests/`
+          - Mock objects: `Tests/SwiftSupabaseSyncTests/Mock*`
 
-          ## Project Structure
-          - Main library: Sources/SwiftSupabaseSync/
-          - Package tests: Tests/SwiftSupabaseSyncTests/
-          - iOS app: SupabaseSwift/
-          - Xcode tests: SupabaseSwiftTests/, SupabaseSwiftUITests/
+          ## 💡 Tips for AI Development
+          - Focus on Swift Package development and testing
+          - Use the mock objects for unit testing
+          - Follow Clean Architecture patterns in the codebase
+          - Test coverage is enabled by default
           EOF
           
           echo "Helper commands saved to copilot-commands.md"
