@@ -10,7 +10,7 @@ import CryptoKit
 
 /// Service responsible for applying conflict resolutions to local storage
 /// Handles the actual application of resolved conflicts with proper data conversion
-public final class SyncConflictResolutionService {
+internal final class SyncConflictResolutionService {
     
     // MARK: - Dependencies
     

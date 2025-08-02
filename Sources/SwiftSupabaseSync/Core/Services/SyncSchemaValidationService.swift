@@ -9,7 +9,7 @@ import Foundation
 
 /// Service responsible for schema compatibility checking and validation
 /// Handles comparison between local and remote schemas for sync entities
-public final class SyncSchemaValidationService {
+internal final class SyncSchemaValidationService {
     
     // MARK: - Dependencies
     

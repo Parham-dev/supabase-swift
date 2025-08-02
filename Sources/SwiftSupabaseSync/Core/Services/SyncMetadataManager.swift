@@ -9,7 +9,7 @@ import Foundation
 
 /// Manages sync metadata storage and retrieval
 /// Handles sync status, timestamps, and state persistence
-public actor SyncMetadataManager {
+internal actor SyncMetadataManager {
     
     // MARK: - Storage
     

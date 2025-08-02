@@ -93,7 +93,7 @@ public final class RepositoryFactory {
     
     /// Create LoggingService instance
     /// - Returns: Configured LoggingService instance
-    public func createLoggingService() -> LoggingService {
+    internal func createLoggingService() -> LoggingService {
         logger?.debug("RepositoryFactory: Creating LoggingService")
         
         return LoggingService()

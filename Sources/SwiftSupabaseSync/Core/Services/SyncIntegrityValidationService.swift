@@ -9,7 +9,7 @@ import Foundation
 
 /// Service responsible for validating sync data integrity
 /// Performs comprehensive checks on sync metadata, content hashes, and data consistency
-public final class SyncIntegrityValidationService {
+internal final class SyncIntegrityValidationService {
     
     // MARK: - Dependencies
     

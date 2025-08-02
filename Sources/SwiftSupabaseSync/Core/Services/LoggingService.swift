@@ -10,7 +10,7 @@ import os.log
 
 /// Implementation of SyncLoggerProtocol that provides configurable logging
 /// Supports different log levels, output destinations, and formatting options
-public final class LoggingService: SyncLoggerProtocol {
+internal final class LoggingService: SyncLoggerProtocol {
     
     // MARK: - Properties
     
@@ -55,10 +55,10 @@ public final class LoggingService: SyncLoggerProtocol {
     // MARK: - Configuration
     
     /// Current log level - only messages at this level or higher will be logged
-    public var logLevel: LogLevel
+    internal var logLevel: LogLevel
     
     /// Active log destinations
-    public var destinations: Set<LogDestination>
+    internal var destinations: Set<LogDestination>
     
     /// Date formatter for log timestamps
     private let dateFormatter: DateFormatter
@@ -98,22 +98,22 @@ public final class LoggingService: SyncLoggerProtocol {
     // MARK: - SyncLoggerProtocol Implementation
     
     /// Log debug message
-    public func debug(_ message: String) {
+    internal func debug(_ message: String) {
         log(.debug, message)
     }
     
     /// Log info message
-    public func info(_ message: String) {
+    internal func info(_ message: String) {
         log(.info, message)
     }
     
     /// Log warning message
-    public func warning(_ message: String) {
+    internal func warning(_ message: String) {
         log(.warning, message)
     }
     
     /// Log error message
-    public func error(_ message: String) {
+    internal func error(_ message: String) {
         log(.error, message)
     }
     
@@ -126,7 +126,7 @@ public final class LoggingService: SyncLoggerProtocol {
     ///   - file: Source file (automatically captured)
     ///   - function: Source function (automatically captured)
     ///   - line: Source line (automatically captured)
-    public func log(
+    internal func log(
         _ level: LogLevel,
         _ message: String,
         file: String = #file,
@@ -222,7 +222,7 @@ public final class LoggingService: SyncLoggerProtocol {
 // MARK: - LogDestination Hashable
 
 extension LoggingService.LogDestination: Hashable {
-    public static func == (lhs: LoggingService.LogDestination, rhs: LoggingService.LogDestination) -> Bool {
+    internal static func == (lhs: LoggingService.LogDestination, rhs: LoggingService.LogDestination) -> Bool {
         switch (lhs, rhs) {
         case (.console, .console), (.osLog, .osLog):
             return true
@@ -237,7 +237,7 @@ extension LoggingService.LogDestination: Hashable {
         }
     }
     
-    public func hash(into hasher: inout Hasher) {
+    internal func hash(into hasher: inout Hasher) {
         switch self {
         case .console:
             hasher.combine("console")
@@ -254,7 +254,7 @@ extension LoggingService.LogDestination: Hashable {
 
 // MARK: - Convenience Methods
 
-public extension LoggingService {
+internal extension LoggingService {
     /// Configure logging for development
     static func configureForDevelopment() {
         shared.logLevel = .debug

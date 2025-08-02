@@ -9,7 +9,7 @@ import Foundation
 
 /// Manages core sync operations and workflows
 /// Handles the orchestration of sync processes
-public final class SyncOperationsManager {
+internal final class SyncOperationsManager {
     
     // MARK: - Dependencies
     
