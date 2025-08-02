@@ -108,8 +108,8 @@ public final class RepositoryFactory {
         logger?.debug("RepositoryFactory: Creating LocalDataSource")
         
         // Note: In a real implementation, we'd need to get the ModelContext from the app
-        // For now, we'll create a placeholder that would need to be injected properly
-        fatalError("LocalDataSource requires ModelContext from the app - this needs to be registered separately")
+        // For now, we'll throw an error instead of using fatalError to avoid build issues
+        throw DIError.serviceNotRegistered("LocalDataSource requires ModelContext from the app - this needs to be registered separately")
     }
     
     /// Create SupabaseAuthDataSource with dependencies

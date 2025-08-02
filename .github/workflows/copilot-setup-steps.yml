@@ -90,13 +90,13 @@ jobs:
         run: |
           echo "Building Swift Package..."
           cd $WORKING_DIR
-          swift build -v
+          swift build
           
       - name: Run Swift Package Tests
         run: |
           echo "Running Swift Package tests..."
           cd $WORKING_DIR
-          swift test -v --enable-code-coverage || echo "Tests failed but continuing setup"
+          swift test --enable-code-coverage || echo "Tests failed but continuing setup"
           
       - name: Setup iOS Simulator
         run: |
