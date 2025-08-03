@@ -372,18 +372,10 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
                 return (uploadedCount: 0, downloadedCount: 0, conflictCount: 0)
             }
             
-            logger?.debug("StartSyncUseCase: Found registration for \\(entityType) -> \\(registration.modelTypeName)")
+            logger?.debug("StartSyncUseCase: Found registration for \(entityType) -> \(registration.modelTypeName)")
             
-            // For now, we'll simulate sync operations based on the known TestTodo type
-            // In a production system, we'd need a type registry that maps string names to actual types
-            if entityType == "todos" || registration.tableName == "todos" {
-                // We know this is TestTodo, so we can perform the sync
-                return try await performTestTodoSync(context: context)
-            } else {
-                logger?.info("StartSyncUseCase: Entity type \\(entityType) not yet supported for sync operations")
-                // For now, return success with no operations for unsupported types
-                return (uploadedCount: 0, downloadedCount: 0, conflictCount: 0)
-            }
+            // Use the registered table name instead of hardcoding "todos"
+            return try await performEntitySync(context: context, tableName: registration.tableName)
             
         } catch {
             logger?.error("StartSyncUseCase: Entity sync failed for \\(entityType): \\(error)")
@@ -391,20 +383,20 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
         }
     }
     
-    /// Perform sync for TestTodo entities with real database operations
-    private func performTestTodoSync(
-        context: SyncOperationContext
+    /// Perform sync for any entity type with real database operations
+    private func performEntitySync(
+        context: SyncOperationContext,
+        tableName: String
     ) async throws -> (uploadedCount: Int, downloadedCount: Int, conflictCount: Int) {
-        logger?.debug("StartSyncUseCase: Performing TestTodo sync with real Supabase operations")
+        logger?.debug("StartSyncUseCase: Performing sync for table '\(tableName)' with real Supabase operations")
         
         do {
             var uploadedCount = 0
             var downloadedCount = 0
             var conflictCount = 0
             
-            // Step 1: Get local TestTodo records that need syncing
-            // We use a generic approach since we can't import TestTodo directly
-            let localRecordsNeedingSync = try await getLocalRecordsNeedingSync(tableName: "todos")
+            // Step 1: Get local records that need syncing for this table
+            let localRecordsNeedingSync = try await getLocalRecordsNeedingSync(tableName: tableName)
             logger?.debug("StartSyncUseCase: Found \(localRecordsNeedingSync.count) local records needing sync")
             
             // Step 2: Upload local changes to Supabase
@@ -424,7 +416,7 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
                     try await updateRemoteRecordsWithSyncTimestamp(
                         syncIDs: successfulSyncIDs,
                         timestamp: syncTimestamp,
-                        tableName: "todos"
+                        tableName: tableName
                     )
                     logger?.info("StartSyncUseCase: Updated \(successfulSyncIDs.count) remote records with sync timestamp")
                 }
@@ -432,7 +424,7 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
             
             // Step 3: Download remote changes from Supabase
             let lastSyncTime = Date.distantPast // For now, sync everything
-            let remoteChanges = try await getRemoteChanges(tableName: "todos", since: lastSyncTime)
+            let remoteChanges = try await getRemoteChanges(tableName: tableName, since: lastSyncTime)
             logger?.debug("StartSyncUseCase: Downloaded \(remoteChanges.count) remote changes")
             
             // Step 4: Apply remote changes to local storage
@@ -445,19 +437,11 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
             // Step 5: Mark records as synced (this triggers the callback for the test)
             let syncTimestamp = Date()
             
-            // For now, use the known table name "todos" but get it from model registry
-            // In production, this method would receive the table name as a parameter
-            let modelRegistry = await ModelRegistryService.shared
-            if let registration = await modelRegistry.getRegistration(for: "todos") {
-                try await syncRepository.markAllRecordsAsSyncedForTable(registration.tableName, at: syncTimestamp)
-                logger?.info("StartSyncUseCase: Marked all \(registration.modelTypeName) records as synced at \(syncTimestamp)")
-            } else {
-                // Fallback to hardcoded table name for now
-                try await syncRepository.markAllRecordsAsSyncedForTable("todos", at: syncTimestamp)
-                logger?.warning("StartSyncUseCase: Using fallback table name 'todos' for sync completion")
-            }
+            // Use the provided table name instead of hardcoding
+            try await syncRepository.markAllRecordsAsSyncedForTable(tableName, at: syncTimestamp)
+            logger?.info("StartSyncUseCase: Marked all \(tableName) records as synced at \(syncTimestamp)")
             
-            logger?.info("StartSyncUseCase: TestTodo sync completed - uploaded: \(uploadedCount), downloaded: \(downloadedCount), conflicts: \(conflictCount)")
+            logger?.info("StartSyncUseCase: Entity sync completed for table '\(tableName)' - uploaded: \(uploadedCount), downloaded: \(downloadedCount), conflicts: \(conflictCount)")
             
             return (
                 uploadedCount: uploadedCount,
@@ -466,20 +450,50 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
             )
             
         } catch {
-            logger?.error("StartSyncUseCase: TestTodo sync failed: \(error)")
+            logger?.error("StartSyncUseCase: Entity sync failed for table '\(tableName)': \(error)")
             throw error
         }
     }
     
-    /// Get local records that need syncing (using repository pattern)
+    /// Get local records that need syncing for any registered table type
     private func getLocalRecordsNeedingSync(tableName: String) async throws -> [SyncSnapshot] {
-        // This is a bridge method that works around the type resolution limitation
-        // In production, this would use the type registry to get actual entity types
+        // Dynamic method that works with any table registered in the ModelRegistry
+        // Currently supports specific entity types with provider methods,
+        // but designed to be extended for any registered Syncable entity type
         
-        guard tableName == "todos" else {
+        // Check if the table is registered in the model registry
+        let modelRegistry = await ModelRegistryService.shared
+        guard let registration = await modelRegistry.getRegistration(for: tableName) else {
+            logger?.warning("StartSyncUseCase: Table '\(tableName)' not registered in model registry")
             return []
         }
         
+        logger?.debug("StartSyncUseCase: Processing records for registered table '\(tableName)' (type: \(registration.modelTypeName))")
+        
+        // Route to specific entity provider based on registered table name
+        // This approach allows supporting any entity type registered in the ModelRegistry
+        switch registration.tableName {
+        case "todos":
+            return try await getTestTodoRecordsNeedingSync()
+        default:
+            logger?.info("StartSyncUseCase: Entity provider not yet implemented for table '\(tableName)' (type: \(registration.modelTypeName))")
+            // TODO: Implement generic entity provider system
+            // In a production system, this would use a generic entity provider that:
+            // 1. Leverages the ModelRegistry to get the Swift type for any registered entity
+            // 2. Uses SwiftData's runtime capabilities to fetch entities of that type
+            // 3. Converts them to SyncSnapshots using reflection or type-specific converters
+            // 
+            // Example future implementation:
+            // return try await getGenericEntityRecordsNeedingSync(
+            //     tableName: tableName, 
+            //     entityType: registration.swiftType
+            // )
+            return []
+        }
+    }
+    
+    /// Get TestTodo records that need syncing
+    private func getTestTodoRecordsNeedingSync() async throws -> [SyncSnapshot] {
         // Get real TestTodo entities from the test provider
         guard let testTodoProvider = LocalDataSource.testTodoProvider else {
             logger?.warning("StartSyncUseCase: No TestTodo provider available")

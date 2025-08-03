@@ -352,15 +352,14 @@ public final class LocalDataSource {
             // This is a helper method for the integration test
             // It uses SwiftData's runtime capabilities to find all entities and mark them as synced
             
-            if tableName == "todos" {
-                // Use SwiftData's model enumeration to find all models that could be TestTodo
-                // This is a reflection-based approach that works without importing the specific type
-                
-                let registeredModels = modelContext.container.schema.entities
-                
-                for entity in registeredModels {
-                    // Check if this entity represents our "todos" table
-                    if entity.name.lowercased().contains("todo") || entity.name.lowercased().contains("test") {
+            // Use SwiftData's model enumeration to find all models that match the table name
+            let registeredModels = modelContext.container.schema.entities
+            
+            for entity in registeredModels {
+                // Check if this entity represents our target table
+                // This supports todos and could be extended for other tables
+                if (tableName == "todos" && (entity.name.lowercased().contains("todo") || entity.name.lowercased().contains("test"))) ||
+                   entity.name.lowercased() == tableName.lowercased() {
                         
                         // Use the entity's name to create a fetch request
                         // This is a low-level approach that works with any Syncable entity
@@ -380,13 +379,12 @@ public final class LocalDataSource {
                         try updateSyncableEntitiesInContext(entityName: entity.name, timestamp: timestamp)
                         
                         // Call the callback if available (for integration tests)
-                        Self.syncMetadataUpdateCallback?("todos", timestamp)
+                        Self.syncMetadataUpdateCallback?(tableName, timestamp)
                     }
                 }
                 
                 try modelContext.save()
                 print("🔄 [LocalDataSource] Marked all \(tableName) records as synced at \(timestamp)")
-            }
             
         } catch {
             throw LocalDataSourceError.updateFailed("Failed to mark all records as synced for table \(tableName): \(error.localizedDescription)")
