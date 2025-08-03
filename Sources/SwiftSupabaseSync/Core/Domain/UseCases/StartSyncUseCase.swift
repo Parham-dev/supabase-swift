@@ -149,8 +149,13 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
             var totalConflicts = 0
             var errors: [SyncError] = []
             
-            // Get all registered entity types (placeholder - would be implemented)
-            let entityTypes = ["User", "SyncStatus"] // In real implementation, this would come from registry
+            // Get all registered entity types from the model registry
+            let modelRegistry = await ModelRegistryService.shared
+            let registeredModels = await modelRegistry.getAllRegistrations()
+            let entityTypes = registeredModels.map { $0.tableName }
+            
+            logger?.info("Found \(entityTypes.count) registered entity types: \(entityTypes)")
+            print("🔍 [StartSyncUseCase] Found \(entityTypes.count) registered entity types: \(entityTypes)")
             
             for entityTypeName in entityTypes {
                 do {

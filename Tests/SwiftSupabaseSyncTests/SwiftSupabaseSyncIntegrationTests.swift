@@ -55,6 +55,10 @@ struct SwiftSupabaseSyncIntegrationTests {
             return "todos"
         }
         
+        static var syncableProperties: [String] {
+            return ["id", "title", "isCompleted", "createdAt", "updatedAt"]
+        }
+        
         init(id: String = UUID().uuidString, title: String, isCompleted: Bool = false) {
             self.id = id
             self.title = title
@@ -425,8 +429,20 @@ struct SwiftSupabaseSyncIntegrationTests {
         // Register model for sync
         sync.registerModel(TestTodo.self)
         
-        // Create test data
+        // Create test data and save to local database
         let todo = TestTodo(title: "Test Todo Item", isCompleted: false)
+        
+        // Get the model context and save the todo
+        guard let localDataSource = RepositoryFactory.testingLocalDataSource else {
+            Issue.record("Local data source not available")
+            return
+        }
+        
+        // Save to SwiftData
+        localDataSource.modelContext.insert(todo)
+        try localDataSource.modelContext.save()
+        
+        print("📦 Todo saved to local database: \(todo.id)")
         
         // Enable sync
         await sync.setSyncEnabled(true)

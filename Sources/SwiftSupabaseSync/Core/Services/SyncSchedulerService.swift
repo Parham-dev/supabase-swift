@@ -58,7 +58,7 @@ internal final class SyncSchedulerService: ObservableObject {
     
     // MARK: - Initialization
     
-    private init(
+    internal init(
         coordinationHub: CoordinationHub = .shared,
         modelRegistry: ModelRegistryService = .shared,
         networkMonitor: NetworkMonitor = .shared,

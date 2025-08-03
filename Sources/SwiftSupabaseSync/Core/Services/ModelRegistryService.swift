@@ -258,6 +258,15 @@ internal final class ModelRegistryService: ObservableObject {
         return registeredModels.values.filter { $0.registeredBy == source }
     }
     
+    /// Get all registered models
+    /// - Returns: Array of all model registrations
+    internal func getAllRegistrations() async -> [ModelRegistration] {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        return Array(registeredModels.values)
+    }
+    
     // MARK: - Model Validation
     
     /// Validate that all registered models have compatible schemas

@@ -83,8 +83,16 @@ public final class SyncManager: ObservableObject {
         self.conflictResolver = conflictResolver
         self.coordinationHub = CoordinationHub.shared
         self.modelRegistry = ModelRegistryService.shared
-        self.syncScheduler = SyncSchedulerService.shared
         self.logger = logger
+        
+        // Create SyncSchedulerService with proper dependencies instead of using shared
+        self.syncScheduler = SyncSchedulerService(
+            coordinationHub: CoordinationHub.shared,
+            modelRegistry: ModelRegistryService.shared,
+            networkMonitor: NetworkMonitor.shared,
+            startSyncUseCase: startSyncUseCase,
+            logger: logger
+        )
         self.syncPolicy = syncPolicy
         self.enableAutoSync = enableAutoSync
         self.syncInterval = syncInterval
