@@ -239,9 +239,21 @@ internal final class SyncOperationsManager {
         var results: [SyncUploadResult] = []
         
         for snapshot in snapshots {
+            logger?.debug("SyncOperationsManager: Processing snapshot \(snapshot.syncID) for table \(snapshot.tableName)")
+            logger?.debug("SyncOperationsManager: Snapshot data: \(snapshot.conflictData)")
+            
             do {
                 // Upload to remote using table name from snapshot
                 let batchResults = try await remoteDataSource.batchUpsert([snapshot], into: snapshot.tableName)
+                
+                logger?.debug("SyncOperationsManager: Batch upsert completed, got \(batchResults.count) results")
+                
+                for (index, batchResult) in batchResults.enumerated() {
+                    logger?.debug("SyncOperationsManager: Result \(index): success=\(batchResult.success)")
+                    if let error = batchResult.error {
+                        logger?.error("SyncOperationsManager: Batch result error: \(error)")
+                    }
+                }
                 
                 let uploadResult = SyncUploadResult(
                     snapshot: snapshot,
@@ -252,7 +264,8 @@ internal final class SyncOperationsManager {
                 results.append(uploadResult)
                 
             } catch {
-                logger?.error("SyncOperationsManager: Failed to upload snapshot \(snapshot.syncID) - \(error.localizedDescription)")
+                logger?.error("SyncOperationsManager: Failed to upload snapshot \(snapshot.syncID) - \(error)")
+                logger?.error("SyncOperationsManager: Error type: \(type(of: error))")
                 let uploadResult = SyncUploadResult(
                     snapshot: snapshot,
                     success: false,
@@ -264,6 +277,11 @@ internal final class SyncOperationsManager {
         
         let successCount = results.filter { $0.success }.count
         logger?.info("SyncOperationsManager: Upload completed - \(successCount)/\(results.count) successful")
+        
+        if successCount == 0 {
+            logger?.error("SyncOperationsManager: All uploads failed! Check authentication and network connectivity")
+        }
+        
         return results
     }
     

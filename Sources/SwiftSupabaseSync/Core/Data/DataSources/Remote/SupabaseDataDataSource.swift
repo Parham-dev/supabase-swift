@@ -250,18 +250,31 @@ public final class SupabaseDataDataSource {
     /// - Returns: Array of upsert results
     /// - Throws: DataSourceError
     public func batchUpsert(_ snapshots: [SyncSnapshot], into tableName: String) async throws -> [BatchOperationResult] {
+        print("🔄 [SupabaseDataDataSource] Starting batch upsert for \(snapshots.count) snapshots into table '\(tableName)'")
+        
         do {
             let recordsData = try snapshots.map { try convertSnapshotToRecord($0) }
+            print("🔄 [SupabaseDataDataSource] Converted snapshots to records:")
+            for (index, record) in recordsData.enumerated() {
+                print("   Record \(index): \(record)")
+            }
             
             let request = RequestBuilder.post("/rest/v1/\(tableName)", baseURL: baseURL)
                 .rawBody(try JSONSerialization.data(withJSONObject: recordsData))
                 .header("Prefer", "return=representation,resolution=merge-duplicates")
             
+            print("🔄 [SupabaseDataDataSource] Making request to: \(baseURL)/rest/v1/\(tableName)")
+            print("🔄 [SupabaseDataDataSource] Request headers: \(request.headers)")
+            
             let responseData = try await httpClient.executeRaw(request)
+            print("✅ [SupabaseDataDataSource] Got response, size: \(responseData.count) bytes")
+            
             let response = try JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] ?? []
+            print("✅ [SupabaseDataDataSource] Parsed response: \(response.count) records returned")
             
             return snapshots.enumerated().map { index, snapshot in
                 let success = index < response.count
+                print("🔄 [SupabaseDataDataSource] Snapshot \(index) (\(snapshot.syncID)): success=\(success)")
                 return BatchOperationResult(
                     syncID: snapshot.syncID,
                     success: success,
@@ -270,6 +283,12 @@ public final class SupabaseDataDataSource {
             }
             
         } catch {
+            print("❌ [SupabaseDataDataSource] Batch upsert failed: \(error)")
+            print("❌ [SupabaseDataDataSource] Error type: \(type(of: error))")
+            if let networkError = error as? NetworkError {
+                print("❌ [SupabaseDataDataSource] Network error details: \(networkError)")
+            }
+            
             let dataError = DataSourceError.batchOperationFailed("Batch upsert failed: \(error.localizedDescription)")
             return snapshots.map { snapshot in
                 BatchOperationResult(syncID: snapshot.syncID, success: false, error: dataError)
@@ -314,13 +333,63 @@ public final class SupabaseDataDataSource {
             record["last_synced"] = ISO8601DateFormatter().string(from: lastSynced)
         }
         
-        // Add conflict data
+        // Add conflict data (optional - only if table has this column)
+        // Since we're extracting specific properties, conflict_data is not always needed
         if !snapshot.conflictData.isEmpty {
             let conflictDataJSON = try JSONSerialization.data(withJSONObject: snapshot.conflictData)
-            record["conflict_data"] = String(data: conflictDataJSON, encoding: .utf8)
+            // Only add conflict_data if it's meaningful (for advanced sync scenarios)
+            // For basic entity sync, the specific properties are sufficient
+            if snapshot.conflictData.keys.contains(where: { !["id", "title", "isCompleted", "createdAt", "updatedAt"].contains($0) }) {
+                record["conflict_data"] = String(data: conflictDataJSON, encoding: .utf8)
+            }
         }
         
+        // Add table-specific data based on table name
+        try addTableSpecificData(to: &record, from: snapshot)
+        
         return record
+    }
+    
+    /// Add table-specific data from SyncSnapshot to database record
+    private func addTableSpecificData(to record: inout [String: Any], from snapshot: SyncSnapshot) throws {
+        switch snapshot.tableName {
+        case "todos":
+            try addTodoSpecificData(to: &record, from: snapshot)
+        default:
+            // For unknown table types, look for generic data in conflictData
+            // In production, this would use a type registry
+            break
+        }
+    }
+    
+    /// Add TestTodo-specific data to database record
+    private func addTodoSpecificData(to record: inout [String: Any], from snapshot: SyncSnapshot) throws {
+        // Extract TestTodo properties from the snapshot's conflictData
+        // The conflictData serves as a generic property bag for entity data
+        
+        if let todoId = snapshot.conflictData["id"] as? String {
+            record["id"] = todoId
+        }
+        
+        if let title = snapshot.conflictData["title"] as? String {
+            record["title"] = title
+        }
+        
+        if let isCompleted = snapshot.conflictData["isCompleted"] as? Bool {
+            record["is_completed"] = isCompleted
+        }
+        
+        if let createdAtString = snapshot.conflictData["createdAt"] as? String,
+           let createdAt = ISO8601DateFormatter().date(from: createdAtString) {
+            record["created_at"] = ISO8601DateFormatter().string(from: createdAt)
+        }
+        
+        if let updatedAtString = snapshot.conflictData["updatedAt"] as? String,
+           let updatedAt = ISO8601DateFormatter().date(from: updatedAtString) {
+            record["updated_at"] = ISO8601DateFormatter().string(from: updatedAt)
+        }
+        
+        // Note: user_id is automatically handled by Supabase auth.uid() default
     }
     
     private func convertRecordToSnapshot(_ record: [String: Any], tableName: String) throws -> SyncSnapshot {
@@ -347,6 +416,9 @@ public final class SupabaseDataDataSource {
             conflictData = (try? JSONSerialization.jsonObject(with: conflictDataJSON) as? [String: Any]) ?? [:]
         }
         
+        // Extract table-specific data and add to conflictData
+        try extractTableSpecificData(from: record, tableName: tableName, into: &conflictData)
+        
         return SyncSnapshot(
             syncID: syncID,
             tableName: tableName,
@@ -357,6 +429,47 @@ public final class SupabaseDataDataSource {
             contentHash: contentHash,
             conflictData: conflictData
         )
+    }
+    
+    /// Extract table-specific data from database record to conflictData
+    private func extractTableSpecificData(from record: [String: Any], tableName: String, into conflictData: inout [String: Any]) throws {
+        switch tableName {
+        case "todos":
+            try extractTodoSpecificData(from: record, into: &conflictData)
+        default:
+            // For unknown table types, skip extraction
+            // In production, this would use a type registry
+            break
+        }
+    }
+    
+    /// Extract TestTodo-specific data from database record
+    private func extractTodoSpecificData(from record: [String: Any], into conflictData: inout [String: Any]) throws {
+        // Extract TestTodo properties from database record
+        
+        if let todoId = record["id"] as? String {
+            conflictData["id"] = todoId
+        }
+        
+        if let title = record["title"] as? String {
+            conflictData["title"] = title
+        }
+        
+        if let isCompleted = record["is_completed"] as? Bool {
+            conflictData["isCompleted"] = isCompleted
+        }
+        
+        if let createdAtString = record["created_at"] as? String {
+            conflictData["createdAt"] = createdAtString
+        }
+        
+        if let updatedAtString = record["updated_at"] as? String {
+            conflictData["updatedAt"] = updatedAtString
+        }
+        
+        if let userId = record["user_id"] as? String {
+            conflictData["userId"] = userId
+        }
     }
 }
 

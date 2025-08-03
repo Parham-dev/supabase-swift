@@ -87,6 +87,12 @@ public protocol SyncRepositoryProtocol {
     ///   - timestamp: Timestamp to set as last synced
     func markRecordsAsSynced(_ syncIDs: [UUID], at timestamp: Date) async throws
     
+    /// Mark all records as synced for a table (helper for integration testing)
+    /// - Parameters:
+    ///   - tableName: Table name to mark records for
+    ///   - timestamp: Sync timestamp
+    func markAllRecordsAsSyncedForTable(_ tableName: String, at timestamp: Date) async throws
+    
     // MARK: - Conflict Management
     
     /// Detect conflicts between local and remote data
