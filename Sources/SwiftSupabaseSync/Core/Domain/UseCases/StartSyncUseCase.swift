@@ -470,25 +470,34 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
         
         logger?.debug("StartSyncUseCase: Processing records for registered table '\(tableName)' (type: \(registration.modelTypeName))")
         
-        // Route to specific entity provider based on registered table name
+        // Route to appropriate entity provider based on registered table name
         // This approach allows supporting any entity type registered in the ModelRegistry
+        
+        // First, try to get a registered entity provider
+        let entityProviderRegistry = EntityProviderRegistry.shared
+        if let provider = entityProviderRegistry.getProvider(forTable: registration.tableName) {
+            logger?.info("StartSyncUseCase: Using registered entity provider for table '\(tableName)' (type: \(provider.entityTypeName))")
+            return try await getRecordsFromProvider(provider)
+        }
+        
+        // Fallback to specific provider methods for backward compatibility
         switch registration.tableName {
         case "todos":
             return try await getTestTodoRecordsNeedingSync()
         default:
-            logger?.info("StartSyncUseCase: Entity provider not yet implemented for table '\(tableName)' (type: \(registration.modelTypeName))")
-            // TODO: Implement generic entity provider system
-            // In a production system, this would use a generic entity provider that:
-            // 1. Leverages the ModelRegistry to get the Swift type for any registered entity
-            // 2. Uses SwiftData's runtime capabilities to fetch entities of that type
-            // 3. Converts them to SyncSnapshots using reflection or type-specific converters
-            // 
-            // Example future implementation:
-            // return try await getGenericEntityRecordsNeedingSync(
-            //     tableName: tableName, 
-            //     entityType: registration.swiftType
-            // )
+            logger?.info("StartSyncUseCase: No entity provider registered for table '\(tableName)' (type: \(registration.modelTypeName))")
+            logger?.info("StartSyncUseCase: Consider registering an EntityProvider for dynamic support")
+            // TODO: In the future, we could implement automatic provider creation
+            // using SwiftData reflection to fetch entities of any registered type
             return []
+        }
+    }
+    
+    /// Helper method to get records from an entity provider
+    private func getRecordsFromProvider(_ provider: any EntityProvider) async throws -> [SyncSnapshot] {
+        let entities = try await provider.getEntitiesNeedingSync()
+        return entities.map { entity in
+            entity.createSyncSnapshot()
         }
     }
     
@@ -626,21 +635,15 @@ public struct StartSyncUseCase: StartSyncUseCaseProtocol {
     private func getRemoteChanges(tableName: String, since: Date) async throws -> [SyncSnapshot] {
         logger?.debug("StartSyncUseCase: Fetching remote changes from table '\(tableName)' since \(since)")
         
-        do {
-            // For now, directly call a method that we'll need to add to the repository
-            // In production, this would be a proper method on SyncRepositoryProtocol
-            
-            // Temporary implementation: we need the actual download functionality
-            // For the test to work, let's return empty for now and implement the test
-            // The test will help us understand what we need to implement
-            
-            logger?.info("StartSyncUseCase: Remote download not yet implemented - returning empty")
-            return []
-            
-        } catch {
-            logger?.error("StartSyncUseCase: Failed to fetch remote changes: \(error)")
-            throw error
-        }
+        // For now, directly call a method that we'll need to add to the repository
+        // In production, this would be a proper method on SyncRepositoryProtocol
+        
+        // Temporary implementation: we need the actual download functionality
+        // For the test to work, let's return empty for now and implement the test
+        // The test will help us understand what we need to implement
+        
+        logger?.info("StartSyncUseCase: Remote download not yet implemented - returning empty")
+        return []
     }
     
     /// Update remote records with sync timestamp after successful upload
