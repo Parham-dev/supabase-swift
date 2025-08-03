@@ -1,6 +1,6 @@
 //
 //  AuthAPI.swift
-//  SupabaseSwift
+//  SwiftSupabaseSync
 //
 //  Created by Parham on 02/08/2025.
 //
@@ -8,158 +8,6 @@
 import Foundation
 import Combine
 import SwiftUI
-
-// MARK: - Public Authentication Status
-
-/// Public authentication status enum
-public enum PublicAuthenticationStatus: String, CaseIterable, Sendable {
-    case signedOut = "signed_out"
-    case signingIn = "signing_in"
-    case signedIn = "signed_in"
-    case signingOut = "signing_out"
-    case refreshingToken = "refreshing_token"
-    case sessionExpired = "session_expired"
-    case error = "error"
-    
-    /// Human-readable description
-    public var description: String {
-        switch self {
-        case .signedOut: return "Signed Out"
-        case .signingIn: return "Signing In"
-        case .signedIn: return "Signed In"
-        case .signingOut: return "Signing Out"
-        case .refreshingToken: return "Refreshing Token"
-        case .sessionExpired: return "Session Expired"
-        case .error: return "Authentication Error"
-        }
-    }
-    
-    /// Whether user can perform sync operations in this state
-    public var canSync: Bool {
-        return self == .signedIn
-    }
-    
-    /// Convert from internal authentication status
-    internal static func fromInternal(_ status: AuthenticationStatus) -> PublicAuthenticationStatus {
-        switch status {
-        case .unauthenticated: return .signedOut
-        case .authenticated: return .signedIn
-        case .expired: return .sessionExpired
-        case .refreshing: return .refreshingToken
-        case .error(_): return .error
-        }
-    }
-}
-
-// MARK: - Public Authentication Result
-
-/// Public authentication result for external consumers
-public struct PublicAuthenticationResult: Sendable {
-    /// Whether authentication was successful
-    public let isSuccess: Bool
-    
-    /// Authenticated user information (if successful)
-    public let user: UserInfo?
-    
-    /// Whether this represents a new user registration
-    public let isNewUser: Bool
-    
-    /// Authentication timestamp
-    public let authenticatedAt: Date
-    
-    /// Error information (if failed)
-    public let error: SwiftSupabaseSyncError?
-    
-    public init(
-        isSuccess: Bool,
-        user: UserInfo? = nil,
-        isNewUser: Bool = false,
-        authenticatedAt: Date = Date(),
-        error: SwiftSupabaseSyncError? = nil
-    ) {
-        self.isSuccess = isSuccess
-        self.user = user
-        self.isNewUser = isNewUser
-        self.authenticatedAt = authenticatedAt
-        self.error = error
-    }
-}
-
-// MARK: - Public Authentication Error Helper
-
-// MARK: - Auth Observer Manager
-
-/// Internal class to manage authentication observers
-internal class AuthObserverManager {
-    private var observers: [WeakAuthObserver] = []
-    private let queue = DispatchQueue(label: "auth.observer.queue", attributes: .concurrent)
-    
-    func addObserver(_ observer: AuthenticationObserver) {
-        queue.async(flags: .barrier) {
-            self.observers.append(WeakAuthObserver(observer))
-            self.cleanupDeallocatedObservers()
-        }
-    }
-    
-    func removeObserver(_ observer: AuthenticationObserver) {
-        queue.async(flags: .barrier) {
-            self.observers.removeAll { $0.observer === observer }
-        }
-    }
-    
-    func notifySignIn(_ user: UserInfo) {
-        queue.async {
-            self.observers.forEach { $0.observer?.userDidSignIn(user) }
-        }
-    }
-    
-    func notifySignOut() {
-        queue.async {
-            self.observers.forEach { $0.observer?.userDidSignOut() }
-        }
-    }
-    
-    func notifyTokenRefresh(_ user: UserInfo) {
-        queue.async {
-            self.observers.forEach { $0.observer?.authenticationDidRefresh(for: user) }
-        }
-    }
-    
-    func notifyAuthenticationFailure(_ error: SwiftSupabaseSyncError) {
-        queue.async {
-            let publicError = self.convertToPublicAuthError(error)
-            self.observers.forEach { $0.observer?.authenticationDidFail(with: publicError) }
-        }
-    }
-    
-    private func cleanupDeallocatedObservers() {
-        observers.removeAll { $0.observer == nil }
-    }
-    
-    private func convertToPublicAuthError(_ error: SwiftSupabaseSyncError) -> PublicAuthenticationError {
-        switch error {
-        case .authenticationFailed(let reason):
-            return PublicAuthenticationError.signInFailed(reason: reason)
-        case .authenticationExpired:
-            return PublicAuthenticationError.tokenRefreshFailed
-        case .networkUnavailable, .serverUnreachable, .requestTimeout:
-            return PublicAuthenticationError.signInFailed(reason: .networkError)
-        case .serverError(_, _):
-            return PublicAuthenticationError.signInFailed(reason: .serverError)
-        default:
-            return PublicAuthenticationError.signInFailed(reason: .serverError)
-        }
-    }
-}
-
-/// Weak reference wrapper for observers
-private class WeakAuthObserver {
-    weak var observer: AuthenticationObserver?
-    
-    init(_ observer: AuthenticationObserver) {
-        self.observer = observer
-    }
-}
 
 // MARK: - Main AuthAPI Class
 
@@ -453,6 +301,12 @@ public final class AuthAPI: ObservableObject {
     
     // MARK: - Private Implementation
     
+    private func setLoading(_ loading: Bool) {
+        Task { @MainActor in
+            self.isLoading = loading
+        }
+    }
+    
     /// Setup bindings between internal AuthManager and public properties
     private func setupBindings() {
         print("🔍 [AuthAPI] Setting up bindings")
@@ -498,146 +352,5 @@ public final class AuthAPI: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: \.lastError, on: self)
             .store(in: &cancellables)
-    }
-    
-    private func setLoading(_ loading: Bool) {
-        Task { @MainActor in
-            self.isLoading = loading
-        }
-    }
-}
-
-// MARK: - Conversion Extensions
-
-extension AuthAPI {
-    
-    /// Convert internal AuthenticationResult to public result
-    private func convertToPublicResult(_ result: AuthenticationResult) -> PublicAuthenticationResult {
-        if result.success, let user = result.user {
-            let publicUser = user.toPublicUserInfo()
-            return PublicAuthenticationResult(
-                isSuccess: true,
-                user: publicUser,
-                isNewUser: result.isNewUser,
-                authenticatedAt: result.authenticatedAt,
-                error: nil
-            )
-        } else {
-            let error = result.error?.toSwiftSupabaseSyncError() ?? 
-                       SwiftSupabaseSyncError.unknown(underlyingError: NSError(domain: "AuthAPI", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unknown authentication error"]))
-            return PublicAuthenticationResult(
-                isSuccess: false,
-                user: nil,
-                isNewUser: false,
-                authenticatedAt: result.authenticatedAt,
-                error: error
-            )
-        }
-    }
-    
-    /// Convert any error to SwiftSupabaseSyncError
-    private func convertToSyncError(_ error: Error) -> SwiftSupabaseSyncError {
-        if let authError = error as? AuthenticationError {
-            return authError.toSwiftSupabaseSyncError()
-        } else if let syncError = error as? SwiftSupabaseSyncError {
-            return syncError
-        } else {
-            return SwiftSupabaseSyncError.unknown(underlyingError: error)
-        }
-    }
-}
-
-// MARK: - Internal Extensions
-
-extension User {
-    func toPublicUserInfo() -> UserInfo {
-        return UserInfo(
-            id: self.id,
-            email: self.email,
-            displayName: self.name,
-            avatarURL: self.avatarURL,
-            metadata: [:],   // Not available in internal User model
-            createdAt: self.createdAt,
-            lastSignInAt: self.lastAuthenticatedAt,
-            emailVerified: true,  // Assume verified if user exists
-            subscriptionTier: PublicSubscriptionTier.fromInternal(self.subscriptionTier)
-        )
-    }
-}
-
-extension AuthenticationError {
-    func toSwiftSupabaseSyncError() -> SwiftSupabaseSyncError {
-        switch self {
-        case .invalidCredentials:
-            return SwiftSupabaseSyncError.authenticationFailed(reason: .invalidCredentials)
-        case .userNotFound:
-            return SwiftSupabaseSyncError.authenticationFailed(reason: .userNotFound)
-        case .emailNotVerified:
-            return SwiftSupabaseSyncError.authenticationFailed(reason: .emailNotVerified)
-        case .accountLocked:
-            return SwiftSupabaseSyncError.authenticationFailed(reason: .accountDisabled)
-        case .networkError:
-            return SwiftSupabaseSyncError.networkUnavailable
-        case .tokenExpired:
-            return SwiftSupabaseSyncError.authenticationExpired
-        case .tokenRefreshFailed:
-            return SwiftSupabaseSyncError.authenticationFailed(reason: .tokenInvalid)
-        case .unknownError(let message):
-            return SwiftSupabaseSyncError.unknown(underlyingError: NSError(domain: "AuthError", code: 0, userInfo: [NSLocalizedDescriptionKey: message]))
-        }
-    }
-}
-
-extension PublicSubscriptionTier {
-    static func fromInternal(_ tier: SubscriptionTier) -> PublicSubscriptionTier {
-        switch tier {
-        case .free:
-            return .free
-        case .pro:
-            return .pro
-        case .enterprise:
-            return .enterprise
-        case .custom(_):
-            return .enterprise  // Map custom to enterprise for public API
-        }
-    }
-}
-
-// MARK: - Subscription Information
-
-/// Subscription information for public consumption
-public struct SubscriptionInfo: Sendable {
-    /// Current subscription tier
-    public let tier: PublicSubscriptionTier
-    
-    /// Available features for this tier
-    public let availableFeatures: [SyncFeature]
-    
-    /// Maximum number of devices allowed
-    public let maxDevices: Int
-    
-    /// Minimum sync interval allowed (in seconds)
-    public let minSyncInterval: TimeInterval
-    
-    /// Whether subscription is active
-    public let isActive: Bool
-    
-    /// Subscription expiration date (if applicable)
-    public let expiresAt: Date?
-    
-    public init(
-        tier: PublicSubscriptionTier,
-        availableFeatures: [SyncFeature],
-        maxDevices: Int,
-        minSyncInterval: TimeInterval,
-        isActive: Bool,
-        expiresAt: Date? = nil
-    ) {
-        self.tier = tier
-        self.availableFeatures = availableFeatures
-        self.maxDevices = maxDevices
-        self.minSyncInterval = minSyncInterval
-        self.isActive = isActive
-        self.expiresAt = expiresAt
     }
 }

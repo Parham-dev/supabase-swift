@@ -9,172 +9,7 @@ import Foundation
 import Combine
 import SwiftData
 
-// MARK: - Public Schema Types
-
-/// Schema validation result for public API
-public struct PublicSchemaValidation: Sendable {
-    
-    /// Model name that was validated
-    public let modelName: String
-    
-    /// Whether the schema is valid
-    public let isValid: Bool
-    
-    /// Schema validation errors
-    public let errors: [String]
-    
-    /// Schema validation warnings
-    public let warnings: [String]
-    
-    /// When validation was performed
-    public let validatedAt: Date
-    
-    /// Whether migration is required
-    public let requiresMigration: Bool
-    
-    public init(
-        modelName: String,
-        isValid: Bool,
-        errors: [String] = [],
-        warnings: [String] = [],
-        validatedAt: Date = Date(),
-        requiresMigration: Bool = false
-    ) {
-        self.modelName = modelName
-        self.isValid = isValid
-        self.errors = errors
-        self.warnings = warnings
-        self.validatedAt = validatedAt
-        self.requiresMigration = requiresMigration
-    }
-}
-
-/// Schema migration result for public API
-public struct PublicSchemaMigration: Sendable {
-    
-    /// Model name that was migrated
-    public let modelName: String
-    
-    /// Whether migration was successful
-    public let success: Bool
-    
-    /// Migration changes applied
-    public let changes: [String]
-    
-    /// When migration was performed
-    public let migratedAt: Date
-    
-    /// Error message if migration failed
-    public let errorMessage: String?
-    
-    public init(
-        modelName: String,
-        success: Bool,
-        changes: [String] = [],
-        migratedAt: Date = Date(),
-        errorMessage: String? = nil
-    ) {
-        self.modelName = modelName
-        self.success = success
-        self.changes = changes
-        self.migratedAt = migratedAt
-        self.errorMessage = errorMessage
-    }
-}
-
-/// Schema information for public API
-public struct PublicSchemaInfo: Sendable {
-    
-    /// Model name
-    public let modelName: String
-    
-    /// Whether model is registered for sync
-    public let isRegistered: Bool
-    
-    /// Schema version
-    public let version: String
-    
-    /// Number of columns in the schema
-    public let columnCount: Int
-    
-    /// Whether schema is compatible with remote
-    public let isCompatible: Bool
-    
-    /// Last validation timestamp
-    public let lastValidated: Date?
-    
-    public init(
-        modelName: String,
-        isRegistered: Bool,
-        version: String,
-        columnCount: Int,
-        isCompatible: Bool,
-        lastValidated: Date? = nil
-    ) {
-        self.modelName = modelName
-        self.isRegistered = isRegistered
-        self.version = version
-        self.columnCount = columnCount
-        self.isCompatible = isCompatible
-        self.lastValidated = lastValidated
-    }
-}
-
-/// Schema operation status
-public enum PublicSchemaStatus: String, CaseIterable, Sendable {
-    case idle = "idle"
-    case validating = "validating"
-    case migrating = "migrating"
-    case generating = "generating"
-    case error = "error"
-    
-    /// Human-readable description
-    public var description: String {
-        switch self {
-        case .idle: return "Ready"
-        case .validating: return "Validating Schema"
-        case .migrating: return "Migrating Schema"
-        case .generating: return "Generating Schema"
-        case .error: return "Schema Error"
-        }
-    }
-    
-    /// Whether schema operations are active
-    public var isActive: Bool {
-        switch self {
-        case .validating, .migrating, .generating: return true
-        case .idle, .error: return false
-        }
-    }
-}
-
-// MARK: - Schema Observer Protocol
-
-/// Protocol for observing schema events
-public protocol SchemaObserver: AnyObject {
-    
-    /// Called when schema validation completes
-    /// - Parameter result: Validation result
-    func schemaValidationCompleted(_ result: PublicSchemaValidation)
-    
-    /// Called when schema migration completes
-    /// - Parameter result: Migration result
-    func schemaMigrationCompleted(_ result: PublicSchemaMigration)
-    
-    /// Called when schema status changes
-    /// - Parameters:
-    ///   - status: New schema status
-    ///   - modelName: Model name (nil for global status)
-    func schemaStatusChanged(_ status: PublicSchemaStatus, for modelName: String?)
-    
-    /// Called when schema error occurs
-    /// - Parameters:
-    ///   - error: Schema error
-    ///   - modelName: Model name where error occurred
-    func schemaErrorOccurred(_ error: SwiftSupabaseSyncError, for modelName: String)
-}
-
-// MARK: - Schema API Implementation
+// MARK: - Main SchemaAPI Class
 
 /// Public API for schema management and validation
 /// Provides simple yet powerful interface for managing data schemas
@@ -231,7 +66,7 @@ public final class SchemaAPI: ObservableObject {
     // MARK: - State Management
     
     private var cancellables = Set<AnyCancellable>()
-    private var observers: [WeakSchemaObserver] = []
+    internal let observerManager = SchemaObserverManager()
     private var autoValidationTimer: Timer?
     
     // MARK: - Initialization
@@ -298,11 +133,6 @@ public final class SchemaAPI: ObservableObject {
             await updateRegisteredSchemas()
             await clearValidationResult(for: T.tableName)
         }
-    }
-    
-    /// Get all registered model names
-    public var registeredModelNames: [String] {
-        Array(registeredSchemas.keys)
     }
     
     // MARK: - Schema Validation
@@ -504,100 +334,6 @@ public final class SchemaAPI: ObservableObject {
         await setStatus(.idle, for: T.tableName)
     }
     
-    // MARK: - Schema Information
-    
-    /// Get schema information for a specific model
-    /// - Parameter modelType: Type of model to get info for
-    /// - Returns: Schema information
-    public func getSchemaInfo<T: Syncable>(for modelType: T.Type) -> PublicSchemaInfo? {
-        return registeredSchemas[T.tableName]
-    }
-    
-    /// Get validation result for a specific model
-    /// - Parameter modelType: Type of model to get validation for
-    /// - Returns: Validation result
-    public func getValidationResult<T: Syncable>(for modelType: T.Type) -> PublicSchemaValidation? {
-        return validationResults[T.tableName]
-    }
-    
-    /// Check if a model is registered
-    /// - Parameter modelType: Type of model to check
-    /// - Returns: Whether model is registered
-    public func isModelRegistered<T: Syncable>(_ modelType: T.Type) -> Bool {
-        return registeredSchemas[T.tableName] != nil
-    }
-    
-    /// Get schema summary for all models
-    /// - Returns: Human-readable schema summary
-    public func getSchemaSummary() -> String {
-        let totalModels = registeredSchemas.count
-        let validModels = validationResults.values.filter { $0.isValid }.count
-        let invalidModels = totalModels - validModels
-        
-        var summary = "Schema Summary:\n"
-        summary += "• Total Models: \(totalModels)\n"
-        summary += "• Valid Schemas: \(validModels)\n"
-        
-        if invalidModels > 0 {
-            summary += "• Invalid Schemas: \(invalidModels)\n"
-        }
-        
-        if status.isActive {
-            summary += "• Status: \(status.description)\n"
-        }
-        
-        return summary
-    }
-    
-    // MARK: - Observer Management
-    
-    /// Add schema observer
-    /// - Parameter observer: Observer to add
-    public func addObserver(_ observer: SchemaObserver) {
-        cleanupObservers()
-        observers.append(WeakSchemaObserver(observer))
-    }
-    
-    /// Remove schema observer
-    /// - Parameter observer: Observer to remove
-    public func removeObserver(_ observer: SchemaObserver) {
-        observers.removeAll { weakObserver in
-            weakObserver.observer === observer
-        }
-    }
-    
-    /// Remove all observers
-    public func removeAllObservers() {
-        observers.removeAll()
-    }
-    
-    // MARK: - Error Management
-    
-    /// Clear all schema errors
-    public func clearErrors() {
-        Task {
-            await MainActor.run {
-                self.lastError = nil
-            }
-        }
-    }
-    
-    /// Get all models with validation errors
-    /// - Returns: Array of model names with errors
-    public func getModelsWithErrors() -> [String] {
-        return validationResults.compactMap { (key, value) in
-            value.errors.isEmpty ? nil : key
-        }
-    }
-    
-    /// Get all models that require migration
-    /// - Returns: Array of model names requiring migration
-    public func getModelsRequiringMigration() -> [String] {
-        return validationResults.compactMap { (key, value) in
-            value.requiresMigration ? key : nil
-        }
-    }
-    
     // MARK: - SQL Generation (No Authentication Required)
     
     /// Generate SQL migration script for a SwiftData model
@@ -619,7 +355,18 @@ public final class SchemaAPI: ObservableObject {
         return generator.generateCombinedSQL(for: modelTypes)
     }
     
-    // MARK: - Private Methods
+    // MARK: - Error Management
+    
+    /// Clear all schema errors
+    public func clearErrors() {
+        Task {
+            await MainActor.run {
+                self.lastError = nil
+            }
+        }
+    }
+    
+    // MARK: - Private State Management
     
     private func setupObservers() {
         // Observe schema manager state
@@ -770,118 +517,8 @@ public final class SchemaAPI: ObservableObject {
         }
     }
     
-    private func notifyObservers(_ notification: (SchemaObserver) -> Void) {
-        cleanupObservers()
-        
-        for weakObserver in observers {
-            if let observer = weakObserver.observer {
-                notification(observer)
-            }
-        }
-    }
-    
-    private func cleanupObservers() {
-        observers.removeAll { $0.observer == nil }
-    }
-    
-    // MARK: - Error Conversion
-    
-    private func convertToPublicError(_ error: Error) -> SwiftSupabaseSyncError {
-        if let schemaError = error as? SchemaError {
-            return convertSchemaError(schemaError)
-        }
-        
-        return .unknown(underlyingError: error)
-    }
-    
-    private func convertSchemaError(_ error: SchemaError) -> SwiftSupabaseSyncError {
-        switch error {
-        case .authenticationRequired:
-            return .authenticationFailed(reason: .sessionExpired)
-        case .modelNotRegistered(let model):
-            return .configurationConflict(parameters: ["Model '\(model)' not registered"])
-        case .schemaGenerationFailed(_, let reason):
-            return .syncSchemaIncompatible(localVersion: "unknown", remoteVersion: reason)
-        case .validationFailed(_, let reason):
-            return .syncValidationFailed(errors: [reason])
-        case .migrationFailed(let table, let reason):
-            return .syncSchemaIncompatible(localVersion: table, remoteVersion: reason)
-        case .migrationsDisabled:
-            return .configurationConflict(parameters: ["Schema migrations disabled"])
-        case .multipleErrors(let errors):
-            return .syncValidationFailed(errors: errors.map { "\($0.key): \($0.value.localizedDescription)" })
-        }
-    }
-    
-    private func convertToPublicValidation(_ result: SchemaValidationResult) -> PublicSchemaValidation {
-        return PublicSchemaValidation(
-            modelName: result.tableName,
-            isValid: result.isValid,
-            errors: result.errors,
-            warnings: result.warnings,
-            validatedAt: result.validatedAt,
-            requiresMigration: !result.isValid && !result.errors.isEmpty
-        )
-    }
-    
     deinit {
         autoValidationTimer?.invalidate()
         cancellables.removeAll()
-    }
-}
-
-// MARK: - Weak Observer Wrapper
-
-private class WeakSchemaObserver {
-    weak var observer: SchemaObserver?
-    
-    init(_ observer: SchemaObserver) {
-        self.observer = observer
-    }
-}
-
-// MARK: - Public Convenience Extensions
-
-public extension SchemaAPI {
-    
-    /// Whether any schema operations are in progress
-    var isActive: Bool {
-        return status.isActive
-    }
-    
-    /// Get summary of schema health
-    var healthSummary: String {
-        if !allSchemasValid {
-            let errorCount = getModelsWithErrors().count
-            let migrationCount = getModelsRequiringMigration().count
-            return "⚠️ \(errorCount) errors, \(migrationCount) migrations needed"
-        } else if registeredSchemas.isEmpty {
-            return "ℹ️ No schemas registered"
-        } else {
-            return "✅ All schemas valid (\(registeredSchemas.count) models)"
-        }
-    }
-    
-    /// Validate and migrate all schemas in one operation
-    /// - Returns: Dictionary of operation results
-    func validateAndMigrateAll() async -> [String: Result<Void, SwiftSupabaseSyncError>] {
-        var results: [String: Result<Void, SwiftSupabaseSyncError>] = [:]
-        
-        // First validate all
-        let validations = await validateAllSchemas()
-        
-        // Then migrate those that need it
-        for (modelName, validation) in validations {
-            if validation.requiresMigration {
-                // Note: This is simplified - real implementation would resolve types
-                results[modelName] = .failure(.configurationConflict(parameters: ["Type resolution needed for migration"]))
-            } else if validation.isValid {
-                results[modelName] = .success(())
-            } else {
-                results[modelName] = .failure(.syncValidationFailed(errors: validation.errors))
-            }
-        }
-        
-        return results
     }
 }

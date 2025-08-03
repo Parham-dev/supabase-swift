@@ -257,6 +257,16 @@ public enum PublicSubscriptionTier: String, CaseIterable, Sendable {
             return SyncFeature.allCases
         }
     }
+    
+    /// Human-readable display name
+    public var displayName: String {
+        switch self {
+        case .free: return "Free"
+        case .basic: return "Basic"
+        case .pro: return "Pro"
+        case .enterprise: return "Enterprise"
+        }
+    }
 }
 
 /// Available sync features
