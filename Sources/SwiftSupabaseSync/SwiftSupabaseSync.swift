@@ -315,6 +315,11 @@ public final class SwiftSupabaseSync: ObservableObject {
 private extension SwiftSupabaseSync {
     
     func initializeDependencyInjection(with configuration: AppConfiguration) async throws {
+        // For development/testing environments, create a test LocalDataSource
+        if configuration.environment == .development || configuration.environment == .testing {
+            try setupTestLocalDataSource()
+        }
+        
         // Initialize the DI container with the configuration
         let diSetup = DependencyInjectionSetup()
         try diSetup.configure(with: configuration)
@@ -322,6 +327,21 @@ private extension SwiftSupabaseSync {
         // Configure ServiceLocator
         let container = diSetup.getContainer()
         ServiceLocator.shared.configure(with: container)
+    }
+    
+    func setupTestLocalDataSource() throws {
+        // Create in-memory SwiftData setup for testing
+        // Start with an empty schema that can be extended
+        let schema = Schema([])
+        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+        let modelContext = ModelContext(modelContainer)
+        
+        // Create LocalDataSource with test ModelContext
+        let testLocalDataSource = LocalDataSource(modelContext: modelContext)
+        
+        // Register it in the RepositoryFactory for DI
+        RepositoryFactory.testingLocalDataSource = testLocalDataSource
     }
     
     func initializeCoreManagers() async throws {

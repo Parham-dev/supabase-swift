@@ -712,7 +712,7 @@ public extension SyncAPI {
     }
     
     /// Convenience method to register multiple models by type
-    /// - Parameter types: Array of Syncable types to register
+    /// - Parameter types: Variadic list of Syncable types to register
     func registerModels<T: Syncable>(_ types: T.Type...) {
         for type in types {
             registerModel(type)

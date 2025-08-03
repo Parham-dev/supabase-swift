@@ -598,6 +598,27 @@ public final class SchemaAPI: ObservableObject {
         }
     }
     
+    // MARK: - SQL Generation (No Authentication Required)
+    
+    /// Generate SQL migration script for a SwiftData model
+    /// This method analyzes the model structure and generates Supabase-compatible SQL
+    /// that users can manually execute in the Supabase SQL editor.
+    /// - Parameter modelType: Model type that has a tableName property
+    /// - Returns: Complete SQL migration script as string
+    public func generateMigrationSQL<T: SQLGeneratable>(for modelType: T.Type) -> String {
+        let generator = SQLScriptGenerator()
+        let script = generator.generateScript(for: modelType)
+        return script.sql
+    }
+    
+    /// Generate SQL migration scripts for multiple models
+    /// - Parameter modelTypes: Array of model types
+    /// - Returns: Combined SQL migration script as string
+    public func generateCombinedMigrationSQL(for modelTypes: [any SQLGeneratable.Type]) -> String {
+        let generator = SQLScriptGenerator()
+        return generator.generateCombinedSQL(for: modelTypes)
+    }
+    
     // MARK: - Private Methods
     
     private func setupObservers() {
