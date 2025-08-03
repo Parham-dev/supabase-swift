@@ -6,7 +6,7 @@
 //
 
 import Testing
-@testable import SupabaseSwift
+@testable import SwiftSupabaseSync
 
 struct SupabaseSwiftTests {
 

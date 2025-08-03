@@ -26,6 +26,7 @@ let package = Package(
                 .product(name: "Supabase", package: "supabase-swift"),
                 .product(name: "Logging", package: "swift-log")
             ],
+            path: "Sources",
             exclude: [
                 "Core/Data/README.md",
                 "Core/Data/DataSources/README.md",
@@ -42,9 +43,6 @@ let package = Package(
                 "Core/Domain/Protocols/README.md",
                 "Core/Domain/Services/README.md",
                 "Core/Domain/UseCases/README.md",
-                "Core/Presentation/README.md",
-                "Core/Presentation/Publishers/README.md",
-                "Core/Presentation/ViewModels/README.md",
                 "Core/Common/Extensions/README.md",
                 "DI/README.md",
                 "Features/README.md",
@@ -72,7 +70,8 @@ let package = Package(
         ),
         .testTarget(
             name: "SwiftSupabaseSyncTests",
-            dependencies: ["SwiftSupabaseSync"]
+            dependencies: ["SwiftSupabaseSync"],
+            path: "SupabaseSwiftTests"
         ),
     ]
 )
